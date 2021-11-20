@@ -361,6 +361,166 @@ function printf(fmt,...)
     write(format(fmt,...))
 end
 
+function split2(arg,sep)
+    local idx = index(arg,sep)
+    if idx then
+        local a = slice(arg,1,idx-1) 
+        local b = slice(arg,idx+1) 
+        return a,b,arg[idx]
+    else
+        return arg,{}
+    end
+end
+
+function index(t,val)
+    local pred
+    if type(val) == 'function' then
+        pred = val
+    else
+        pred = function(a) return a == val end
+    end
+    for i,v in ipairs(t) do
+        if pred(v) then
+            return i
+        end
+    end
+end
+
+function contains(aa, word)
+    if index(aa,word) then
+        return true
+    end
+    -- match just the word with the frontier pattern
+    word = '%f[%a]'..word..'%f[%A]'
+    for _,a in ipairs(aa) do
+        if a:match(word) then
+            return true
+        end
+    end
+    return false    
+end
+
+function map(t,fun)
+    local res = {}
+    for i = 1,#t do
+        push(res,fun(t[i]))
+    end
+    return res
+end
+
+function split(s,re,buff)
+    local find,sub = string.find, string.sub
+    local i1,ls = 1,buff or {}
+    if not re then re = '%s+' end
+    if re == '' then return {s} end
+    while true do
+        local i2,i3 = find(s,re,i1)
+        if not i2 then
+            local last = sub(s,i1)
+            if last ~= '' then push(ls,last) end
+            if #ls == 1 and ls[1] == '' then
+                return {}
+            else
+                return ls
+            end
+        end
+        push(ls,sub(s,i1,i2-1))
+        i1 = i3+1
+    end
+end
+
+function spliti(s,re)
+	return iter(split(s,re))
+end
+
+local field_names
+
+function fields(parms)
+    if not field_names then
+        field_names = split(parms.cols,',')
+        _G.COLS = field_names
+    end
+    parms.cols = nil
+    local delim = eat(parms,'delim')
+    local pat = eat(parms,'pat')
+    local line = eat(parms,1)
+    -- and we will REUSE the table
+    local result = parms
+    local splitted
+    if pat then
+        splitted = {line:match(pat)}
+    else
+        splitted = split(line,delim)
+    end 
+    for i = 1,#splitted do
+        local v = splitted[i]
+        local maybe_num = tonumber(v)
+        if maybe_num then
+            v = maybe_num
+        end
+        result[field_names[i]] = v
+    end
+    if #splitted == 0 then
+        return nil
+    end
+    return result
+end
+
+local function fixup_url(p)
+	if type(p) == 'string' then
+		p = {p}
+	end
+	local url = p[1]
+	if not url:match('^%a+://') and URL then
+		p[1] = URL..url
+	end
+	p.silent = true
+	table.insert(p,1,'curl')
+	p.header = {}
+	return p	
+end
+
+local function finis(p)
+	local headers = eat(p,'headers')
+	if headers then
+		for k,v in pairs(headers) do
+			push(p.header,k..': '..v)
+		end
+	end
+	return exec(p)
+end
+
+function post(p)
+	p=fixup_url(p)	
+	local ty = type(p.data)
+	if ty == 'table' then
+		p.data = json(p.data)
+		if not p.headers then p.headers = {} end
+		p.headers['content-type'] = 'application/json'
+	end
+	return finis(p)
+end
+
+function get(p)
+	p=fixup_url(p)	
+	local query = eat(p,'query')
+	if query then
+		p.G = true		
+		assert(type(query)=='table')
+		local data = {}
+		for k,v in pairs(query) do
+			append(data,k..'='..v)
+		end
+		p['data-urlencode'] = data
+	end
+	return finis(p)
+end	
+
+function quit(msg)
+    io.stderr:write(msg,'\n')
+    os.exit(1)
+end
+
 function slice(t,i1,i2)
     local res = {}
     if not i2 then
@@ -779,6 +939,9 @@ function subexpr(arg,iter)
 end
 
 function main(arg)
+    if #arg == 0 then
+        quit('el <expression>. Like sin[2*pi] or date ^%c')
+    end
     loads()
     set_global_lookup()
     debug = os.getenv('ELDBG') or os.getenv('eldbg')
@@ -855,164 +1018,5 @@ function main(arg)
     end
 end
 
-function split2(arg,sep)
-    local idx = index(arg,sep)
-    if idx then
-        local a = slice(arg,1,idx-1) 
-        local b = slice(arg,idx+1) 
-        return a,b,arg[idx]
-    else
-        return arg,{}
-    end
-end
 
-function index(t,val)
-    local pred
-    if type(val) == 'function' then
-        pred = val
-    else
-        pred = function(a) return a == val end
-    end
-    for i,v in ipairs(t) do
-        if pred(v) then
-            return i
-        end
-    end
-end
-
-function contains(aa, word)
-    if index(aa,word) then
-        return true
-    end
-    -- match just the word with the frontier pattern
-    word = '%f[%a]'..word..'%f[%A]'
-    for _,a in ipairs(aa) do
-        if a:match(word) then
-            return true
-        end
-    end
-    return false    
-end
-
-function map(t,fun)
-    local res = {}
-    for i = 1,#t do
-        push(res,fun(t[i]))
-    end
-    return res
-end
-
-function split(s,re,buff)
-    local find,sub = string.find, string.sub
-    local i1,ls = 1,buff or {}
-    if not re then re = '%s+' end
-    if re == '' then return {s} end
-    while true do
-        local i2,i3 = find(s,re,i1)
-        if not i2 then
-            local last = sub(s,i1)
-            if last ~= '' then push(ls,last) end
-            if #ls == 1 and ls[1] == '' then
-                return {}
-            else
-                return ls
-            end
-        end
-        push(ls,sub(s,i1,i2-1))
-        i1 = i3+1
-    end
-end
-
-function spliti(s,re)
-	return iter(split(s,re))
-end
-
-local field_names
-
-function fields(parms)
-    if not field_names then
-        field_names = split(parms.cols,',')
-        _G.COLS = field_names
-    end
-    parms.cols = nil
-    local delim = eat(parms,'delim')
-    local pat = eat(parms,'pat')
-    local line = eat(parms,1)
-    -- and we will REUSE the table
-    local result = parms
-    local splitted
-    if pat then
-        splitted = {line:match(pat)}
-    else
-        splitted = split(line,delim)
-    end 
-    for i = 1,#splitted do
-        local v = splitted[i]
-        local maybe_num = tonumber(v)
-        if maybe_num then
-            v = maybe_num
-        end
-        result[field_names[i]] = v
-    end
-    if #splitted == 0 then
-        return nil
-    end
-    return result
-end
-
-local function fixup_url(p)
-	if type(p) == 'string' then
-		p = {p}
-	end
-	local url = p[1]
-	if not url:match('^%a+://') and URL then
-		p[1] = URL..url
-	end
-	p.silent = true
-	table.insert(p,1,'curl')
-	p.header = {}
-	return p	
-end
-
-local function finis(p)
-	local headers = eat(p,'headers')
-	if headers then
-		for k,v in pairs(headers) do
-			push(p.header,k..': '..v)
-		end
-	end
-	return exec(p)
-end
-
-function post(p)
-	p=fixup_url(p)	
-	local ty = type(p.data)
-	if ty == 'table' then
-		p.data = json(p.data)
-		if not p.headers then p.headers = {} end
-		p.headers['content-type'] = 'application/json'
-	end
-	return finis(p)
-end
-
-function get(p)
-	p=fixup_url(p)	
-	local query = eat(p,'query')
-	if query then
-		p.G = true		
-		assert(type(query)=='table')
-		local data = {}
-		for k,v in pairs(query) do
-			append(data,k..'='..v)
-		end
-		p['data-urlencode'] = data
-	end
-	return finis(p)
-end	
-
-function quit(msg)
-    io.stderr:write(msg,'\n')
-    os.exit(1)
-end
-    
 main(arg)
