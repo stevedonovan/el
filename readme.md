@@ -278,7 +278,7 @@ $ cat log.log | el gsub it ^'%d+' tstamp[^'%F %T']
 
 Filters are an important part of the shell experience, and I wanted `el` to be useful in shell pipelines.
 
-```sh
+```
 $ cat text.txt
 Normally text isn't as interesting
 as a line from a poem,
@@ -343,15 +343,14 @@ We inject all the functions available in `math,io,os,string,bit32,table`, but so
 
 Note that the format string passed to `format` and `printf` is specially massaged: '%rs' means 'print this string in red' and '%b00d` is 'print this integer with blue'. These are available `{r=red, g=green, y=yellow, b=blue, m=magenta, c=cyan, w=white}`. (This of course needs support for ANSI codes, which even _Windows_ does these days)
 
-  -`len` is redefined in terms of `#t`
-  -`gsub` returns only the string
-  -`insert` also sets `auto_save`
-  -`sort` returns the table
-  -`write` sets `print_newline` flag so `el` ends with a newline
-
-  -`append` like `insert` except _multiple_ values can be pushed, and `auto_save` is set
-  -`first` return the non-whitespace start of a string (replaces the clunky `awk '{print $1}'`)
-  -`printf` just `write(format(fmt,...))`
+  - `len` is redefined in terms of `#t`
+  - `gsub` returns only the string
+  - `insert` also sets `auto_save`
+  - `sort` returns the table
+  - `write` sets `print_newline` flag so `el` ends with a newline
+  - `append` like `insert` except _multiple_ values can be pushed, and `auto_save` is set
+  - `first` return the non-whitespace start of a string (replaces the clunky `awk '{print $1}'`)
+  - `printf` just `write(format(fmt,...))`
   - `json` render a value as JSON
   - `lua` render a value in Lua format
   - `exec` collect arguments together and run as shell. Any map-like key-value pairs become flags, and if the value is an array, it represents multiple flags.
@@ -421,23 +420,23 @@ scratch$ el post data={one=1 two=2} headers={one=^first two=^second} ^/anything
 ```
   
 There are some useful iterators:
-  -`seq` i1,i2,inc - `inc` defaults to 1, and if no `i2` the range is 1 .. `i1`
-  -`iter` t returns each value of a table sequence
-  -`items` takes an arbitrary number of arguments and iterates over them
-  -`spliti` s,re  - parts of string separated by delim
+  - `seq` i1,i2,inc - `inc` defaults to 1, and if no `i2` the range is 1 .. `i1`
+  - `iter` t returns each value of a table sequence
+  - `items` takes an arbitrary number of arguments and iterates over them
+  - `spliti` s,re  - parts of string separated by delim
   
 Conversions:
-  -`bin` renders as binary, least signicant bit first
-  -`hex` renders as hexadecimal
+  - `bin` renders as binary, least signicant bit first
+  - `hex` renders as hexadecimal
   
 Generally useful:
-  -`slice` t,i1,i2 makes a copy of a range of an array
-  -`index` t,val - index of val in the array
-  -`split` s,re - parts of string separated by delim
-  -`map` t,f apply the function `f` and create a new table. Only non-nil values so this is a _filter map_
-  -`fields` p.cols,p.delim,p.pat - this parses delimited fields and constructs a table
+  - `slice` t,i1,i2 makes a copy of a range of an array
+  - `index` t,val - index of val in the array
+  - `split` s,re - parts of string separated by delim
+  - `map` t,f apply the function `f` and create a new table. Only non-nil values so this is a _filter map_
+  - `fields` p.cols,p.delim,p.pat - this parses delimited fields and constructs a table
 
-For eaample, here is a `which`. Can make it clearer with a few functions:
+For eaample, here is a `which`, which is made clearer with a few functions:
 
 ```sh
 $ el split PATH ^: : map it {p: open['p.."/go"'] and p}
@@ -447,7 +446,7 @@ $ el set exists={p: open[p] and p}
 $ el split PATH ^: : map it {p: exists join[p,^go]}
 {"/home/steve/sdk/go1.16.3/bin/go"}
 ```
-The result is a table with holes. This is more elegant:
+The result is a table; this is more elegant:
 
 ```sh
 $ el spliti PATH ^: do exists {join it ^go}
