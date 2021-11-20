@@ -322,8 +322,8 @@ end
 function exec(name,...)
     local name,args = parameters(name,...)
     local cmd = {name}
-    for k,v in pairs(t) do
-        if not (type(k) == 'number' and k >= 1 and k <= #t) then
+    for k,v in pairs(args) do
+        if not (type(k) == 'number' and k >= 1 and k <= #args) then
             local flagc = '--'
             if #k == 1 then
                 flagc = '-'
