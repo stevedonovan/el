@@ -191,13 +191,22 @@ local red,green,yellow,blue,magenta,cyan,white = '31','32','33','34','35','36','
 local colours = {r=red, g=green, y=yellow, b=blue, m=magenta, c=cyan, w=white}
 local reset = '\x1b[0m'
 
-function massage_format(fmt)
-    return fmt:gsub('%%(%a)([%d.]*%a)',function(clr,flg)
-        return '\x1b['..colours[clr]..';1m%'..flg..reset
-    end)
+local function wrap_colour(prefix,clr,body)
+    return '\x1b['..colours[clr]..';1m'..prefix..body..reset
 end
 
-local aliases = {}
+local function massage_format(fmt)
+    return fmt:gsub('(%%)(%a)([%d.]*%a)',wrap_colour)
+end
+
+paint = setmetatable({},{
+    __index = function(t,clr)
+        return function(body)
+            return wrap_colour('',clr,body)
+        end
+    end
+})
+
 
 function foldgen (zero,op)
     return function(...)
@@ -209,16 +218,12 @@ function foldgen (zero,op)
     end
 end
 
-local function foldop (name, alias, zero, op)
+local function foldop (name, zero, op)
     _G[name] = foldgen(zero,op)
-    if alias then
-        _G[alias] = _G[name]
-        aliases[alias] = name
-    end
 end
 
-foldop('add','+',0,function(acc,v) return acc + v end)
-foldop('mul','*',1,function(acc,v) return acc * v end)
+foldop('add',0,function(acc,v) return acc + v end)
+foldop('mul',1,function(acc,v) return acc * v end)
 
 local call_meta = {
     __call = function(t,k)
@@ -919,9 +924,6 @@ function subexpr(arg,iter)
             args[1] = massage_format(args[1])
         end 
         call = table.concat(args,',')
-        if aliases[expr] then
-            expr = aliases[expr]
-        end
         if not has_vars then
             expr = expr..'('..call..')'
         else

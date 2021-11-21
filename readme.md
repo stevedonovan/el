@@ -341,7 +341,7 @@ The implementation itself is a fevered hot mess of string patterns and substitut
 
 We inject all the functions available in `math,io,os,string,bit32,table`, but some functions are adjusted. A chain of expressions is better than a seriously nested set of function invocations.
 
-Note that the format string passed to `format` and `printf` is specially massaged: '%rs' means 'print this string in red' and '%b00d` is 'print this integer with blue'. These are available `{r=red, g=green, y=yellow, b=blue, m=magenta, c=cyan, w=white}`. (This of course needs support for ANSI codes, which even _Windows_ does these days)
+Note that the format string passed to `format` and `printf` is specially massaged: '%rs' means 'print this string in red' and '%b00d` is 'print this integer with blue'. These are available `{r=red, g=green, y=yellow, b=blue, m=magenta, c=cyan, w=white}`. (This of course needs support for ANSI codes, which even _Windows_ does these days). There is a global `paint` which is a paint factory: `paint.r` is a function that colours its argument.
 
   - `len` is redefined in terms of `#t`
   - `gsub` returns only the string
@@ -355,6 +355,7 @@ Note that the format string passed to `format` and `printf` is specially massage
   - `lua` render a value in Lua format
   - `exec` collect arguments together and run as shell. Any map-like key-value pairs become flags, and if the value is an array, it represents multiple flags.
   - `get`,`post` wrappers around `curl` that use `exec`
+  
   
 ```sh
 $ el set T={}
