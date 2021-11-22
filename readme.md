@@ -85,6 +85,14 @@ collect.lua
 test.sh
 ...
 ```
+You can save aliases to functions within modules, but there is a little catch:
+
+```sh
+$ el set dir=^lfs.dir
+$ el dir ^. do it
+...
+```
+The expression has to be quoted, because after it is evaluated, we have _no idea_ where the function came from (and in fact, not even its name without using the debug interface). So it must be a 'dotted expression' which we look up and confirm that it does resolve and handled specially.
 
 Now, I have not forgotten that the _original itch_, before the explosion of curiosity, was to make a convenient technical calculator. We work with bits, so support for binary is useful & educational. Lua does not have binary literals, but we can make something similar happen at lookup time - check if it starts with 'b' and follows with binary digits. Bits go from least significant up, as is the usual tradition:
 
@@ -498,6 +506,8 @@ return saved
 For regular data values, things are straightforward: they get put into `saved` using the `_ENV` strategy. But we put the actual functions into `_G`, and keep their code representation in the `_LITERAL_` table. Next time `set` gets called, the values will be separated into data and functions, and the values go after the `_ENV=saved`, and the functions get copied into `_LITERAL_`.
 
 A similar trick is used for `add_file` (uses `dofile('/path/to/file')`) and `add_mod` (uses `mod=require('mod`)`)
+
+A hack was required to make functions work - we automatically _quote them as strings_ in a key-value context.
 
 Saving/loading is the platform-dependent part here, should not be difficult to generalize. A sensible person might ask: can you not just add some dependencies? But nah: single-file Lua is the way to make things easier for users, although it might offend our fine-tuned developer feelings.
 

@@ -613,7 +613,7 @@ function save(tbl)
     local out = {}
     push(out,'local saved = {_G=_G};_ENV=saved')
     for k,v in pairs(tbl) do
-        if is_function(v) then
+        if is_function(v) or dotted_lookup(v) then
             literals[k] = v
         else
             if v == '' then -- i.e clear the var...
@@ -637,16 +637,21 @@ function save(tbl)
             if vs ~= nil then
                 push(out,('%s=%s'):format(k,vs))
             end 
-        else 
+        else
             push(out,vs)
         end 
     end
     if next(literals) then
         push(out,'_ENV=saved._G')
         for k,v in pairs(literals) do
+            if v:match('^require') then -- force these chaps to the front!
+                push(out,('%s=%s'):format(k,v))
+            end
+        end
+        for k,v in pairs(literals) do
             if v:match('^dofile') then
                 push(out,v)
-            else
+            elseif not v:match('^require') then
                 push(out,('%s=%s'):format(k,v))
             end
         end
@@ -786,19 +791,25 @@ function is_op(name)
     return name and (name:match('^[%+%*<>/|~]+$') or name=='and' or name=='or')
 end
 
-function is_global_fun(expr)
+function dotted_lookup(expr)
+    if type(expr) ~= 'string' then
+        return nil
+    end
     if expr:match('%.') then
         local parts = split(expr,'%.')
         local v = global_lookup(parts[1])
         for i = 2,#parts do
             if v == nil then return false end
             v = v[parts[i]]
-            if type(v) == 'function' then return true end
         end
-        return false
+        return v
     else
-        return type(global_lookup(expr)) == 'function'
+        return global_lookup(expr)
     end
+end
+
+function is_global_fun(expr)
+    return type(dotted_lookup(expr)) == 'function'
 end
 
 function is_conv_fun(expr)
