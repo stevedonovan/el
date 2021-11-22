@@ -893,8 +893,10 @@ function subexpr(arg,iter)
     end
     local has_vars
     for i = 2,#arg do
-        local sub
-        local val,var = split_key_val(arg[i])
+        local val,sub,var = sub_marker(arg[i])
+        if not sub then 
+            val,var = split_key_val(val)
+        end
         if not quoted_fun then
             val = quote(val)
         end
