@@ -101,18 +101,18 @@ function printx(...)
         end
     end
     if not_nil then
-		local n = #args
+        local n = #args
         for i = 1,n do
-			local a = args[i]
-			if type(a) == 'table' then
-				a = lua(a)
-			else
-				a = tostring(a)
-			end
+            local a = args[i]
+            if type(a) == 'table' then
+                a = lua(a)
+            else
+                a = tostring(a)
+            end
             io.write(a)
             if i ~= n then
-				io.write(ELSEP)
-			end	
+                io.write(ELSEP)
+            end 
         end
         print() 
     end
@@ -245,10 +245,10 @@ function list(...)
 end
 
 function stop(val)
-	if val then
-		printx(val)
-		os.exit(0)
-	end
+    if val then
+        printx(val)
+        os.exit(0)
+    end
 end
 
 function iter(t)
@@ -292,16 +292,16 @@ function readfile(sa)
 end
 
 local function has_space(s)
-	return s:match('%s') or s:match('"')
+    return s:match('%s') or s:match('"')
 end
 
 local function massage(s)
-	if s == true or s == 'true' then
-		s = ''
-	elseif type(s) == 'string' and has_space(s) then
-		s = squote(s)
-	end
-	return s
+    if s == true or s == 'true' then
+        s = ''
+    elseif type(s) == 'string' and has_space(s) then
+        s = squote(s)
+    end
+    return s
 end
 
 function parameters(arg,...)
@@ -350,9 +350,9 @@ function exec(name,...)
     end
     
     cmd = table.concat(cmd,' ')
-	if debug then
-		print('cmd',cmd)
-	end
+    if debug then
+        print('cmd',cmd)
+    end
     return readf(assert(io.popen(cmd,'r')))
 end
 
@@ -435,7 +435,7 @@ function split(s,re,buff)
 end
 
 function spliti(s,re)
-	return iter(split(s,re))
+    return iter(split(s,re))
 end
 
 local field_names
@@ -472,54 +472,54 @@ function fields(parms)
 end
 
 local function fixup_url(p)
-	if type(p) == 'string' then
-		p = {p}
-	end
-	local url = p[1]
-	if not url:match('^%a+://') and URL then
-		p[1] = URL..url
-	end
-	p.silent = true
-	table.insert(p,1,'curl')
-	p.header = {}
-	return p	
+    if type(p) == 'string' then
+        p = {p}
+    end
+    local url = p[1]
+    if not url:match('^%a+://') and URL then
+        p[1] = URL..url
+    end
+    p.silent = true
+    table.insert(p,1,'curl')
+    p.header = {}
+    return p    
 end
 
 local function finis(p)
-	local headers = eat(p,'headers')
-	if headers then
-		for k,v in pairs(headers) do
-			push(p.header,k..': '..v)
-		end
-	end
-	return exec(p)
+    local headers = eat(p,'headers')
+    if headers then
+        for k,v in pairs(headers) do
+            push(p.header,k..': '..v)
+        end
+    end
+    return exec(p)
 end
 
 function post(p)
-	p=fixup_url(p)	
-	local ty = type(p.data)
-	if ty == 'table' then
-		p.data = json(p.data)
-		if not p.headers then p.headers = {} end
-		p.headers['content-type'] = 'application/json'
-	end
-	return finis(p)
+    p=fixup_url(p)  
+    local ty = type(p.data)
+    if ty == 'table' then
+        p.data = json(p.data)
+        if not p.headers then p.headers = {} end
+        p.headers['content-type'] = 'application/json'
+    end
+    return finis(p)
 end
 
 function get(p)
-	p=fixup_url(p)	
-	local query = eat(p,'query')
-	if query then
-		p.G = true		
-		assert(type(query)=='table')
-		local data = {}
-		for k,v in pairs(query) do
-			append(data,k..'='..v)
-		end
-		p['data-urlencode'] = data
-	end
-	return finis(p)
-end	
+    p=fixup_url(p)  
+    local query = eat(p,'query')
+    if query then
+        p.G = true      
+        assert(type(query)=='table')
+        local data = {}
+        for k,v in pairs(query) do
+            append(data,k..'='..v)
+        end
+        p['data-urlencode'] = data
+    end
+    return finis(p)
+end 
 
 function quit(msg)
     io.stderr:write(msg,'\n')
@@ -909,10 +909,10 @@ function subexpr(arg,iter)
                    local a = args[i]
                    -- functions get string-quoted (to be saved) but do check them!
                    if is_function(a) then
-						local _,e = load('return '..a)
-						if e then
-							quit('cannot compile '..e)
-						end
+                        local _,e = load('return '..a)
+                        if e then
+                            quit('cannot compile '..e)
+                        end
                         a = ('%q'):format(a)
                    end
                    args[i] = quote_key(vars[i])..'='..a
@@ -947,7 +947,7 @@ function main(arg)
     loads()
     set_global_lookup()
     debug = os.getenv('ELDBG') or os.getenv('eldbg')
-	ELSEP = '\t'
+    ELSEP = '\t'
 
     local itera,expra = split2(arg,'do')
     local print_final,expr = true
