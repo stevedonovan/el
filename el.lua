@@ -1,4 +1,4 @@
-#!/usr/bin/lua
+#!/usr/bin/lua5.3
 -- Flatten ALL those tidy tables and add environment lookup
 
 local saved_globals = {}
@@ -31,8 +31,13 @@ function global_lookup(key)
     return os.getenv(key)
 end
 
+function set_autosave()
+    auto_save = true
+end
+
 function set_global_lookup()
     tables = {math,io,os,string,bit32,table,saved_globals}
+    g_saved_globals = saved_globals
     setmetatable(_G,{
         __index = function(t,key)
             local v = global_lookup(key)
@@ -788,7 +793,7 @@ function is_iden(name)
 end
 
 function is_op(name)
-    return name and (name:match('^[%+%*<>/|~]+$') or name=='and' or name=='or')
+    return name and (name:match('^[%+%*<>/|~&]+$') or name=='and' or name=='or')
 end
 
 function dotted_lookup(expr)
