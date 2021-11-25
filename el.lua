@@ -141,9 +141,15 @@ function seq(i1,i2,inc)
     
 end
 
+null = setmetatable({},{
+    __tostring = function(t)
+        return "null"
+    end
+})
+
 function json(t)
     local ty = type(t)
-    if ty == 'table' then
+    if ty == 'table' and t ~= null then
         if #t > 0 then
             local res = map(t,json)
             return '['..table.concat(res,',')..']'
@@ -896,6 +902,7 @@ function subexpr(arg,iter)
         push(arg,1,expr)
         expr = implicit
     end
+
     local has_vars
     for i = 2,#arg do
         local val,sub,var = sub_marker(arg[i])
@@ -913,7 +920,7 @@ function subexpr(arg,iter)
             vars[im1] = ''      
         end
         val,sub = sub_marker(val)
-        if quoted_fun and not sub then
+        if quoted_fun and not sub and tostring(val) ~= 'null' then
             val = squote(val)
         end
         args[im1] = val
@@ -1037,6 +1044,5 @@ function main(arg)
         print()
     end
 end
-
 
 main(arg)
