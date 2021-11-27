@@ -364,7 +364,8 @@ function exec(name,...)
     if debug then
         print('cmd',cmd)
     end
-    return readf(assert(io.popen(cmd,'r')))
+    local res = readf(assert(io.popen(cmd,'r'))):gsub('%s+$','')
+    return res
 end
 
 function writefile(path,contents)
@@ -733,7 +734,7 @@ function quote(a)
     -- an argment may be @file
     sa = a:match '^@(.+)'
     if sa then
-        return ('%q'):format(readfile(sa)),var
+        return ('%q'):format(readfile(sa))
     elseif a:match '%^' then
         -- there may be ^strings
         sa = a:gsub('([^%w)%]])%^([^)%],]+)',function(pre,str)
