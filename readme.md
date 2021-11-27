@@ -160,6 +160,13 @@ Note the important space after `*.lua` for the shell expansion to work!
 
 In the special case of subexprs, `{^ one two}` is the shortcut for `{list^ one two}`.
 
+Also (borrowed from the convention set by `curl` and others) a file may be directly read in as a string using `@filename`. The special filename `stdin` means 'read standard input'.
+
+```sh
+$ el split @text.txt ^'\n'
+{"Normally text isn't as interesting","as a line from a poem,","or a sentence scrawled in lipstick","on the bathroom mirror"}
+```
+
 ## Hit and Miss: it and this
 
 We can calculate now, but not repeat calculations. The keyword `do` separates the command-line into two expressions, the first is an iterator, the second an expression that will consume the iterator. The first value passed by the iterator is `it` (as in Kotlin) and the second value is `this`. The value of the expression will be printed out if `it` is not `nil`. (Generally you should treat `it` as reserved word since weird shit will happen if you use it in other contexts.)
@@ -439,13 +446,27 @@ Conversions:
   - `hex` renders as hexadecimal
   
 Generally useful:
+  - `add`,`mul` and `cat` are n-ary functions (for when using the operators is tedious)
   - `slice` t,i1,i2 makes a copy of a range of an array
   - `index` t,val - index of val in the array
   - `split` s,re - parts of string separated by delim
   - `map` t,f apply the function `f` and create a new table. Only non-nil values so this is a _filter map_
+  - `zipmap` t1,t2(,f) zip two tables together. If `f` is provided, use that instead of `{a,b: {a,b}}`
   - `fields` p.cols,p.delim,p.pat - this parses delimited fields and constructs a table
 
-For eaample, here is a `which`, which is made clearer with a few functions:
+Some examples. Here we concatenate some items together (`add` and `mul` are useful here!). Then some array operations, using `:` to build up a chain of operations:
+
+```sh
+$ el zipmap {1 2 3} {^ one two three} cat
+{"1one","2two","3three"}
+$ el T
+{"one","two","three","four"}
+$ el index T ^three : slice T it : map it upper
+{"THREE","FOUR"}
+
+```
+
+Here is a `which`, which is made clearer with a few functions:
 
 ```sh
 $ el split PATH ^: : map it {p: open['p.."/go"'] and p}

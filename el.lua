@@ -235,6 +235,7 @@ end
 
 foldop('add',0,function(acc,v) return acc + v end)
 foldop('mul',1,function(acc,v) return acc * v end)
+foldop('cat','',function(acc,v) return acc .. v end)
 
 local call_meta = {
     __call = function(t,k)
@@ -734,7 +735,7 @@ function quote(a)
     -- an argment may be @file
     sa = a:match '^@(.+)'
     if sa then
-        return ('%q'):format(readfile(sa))
+        return ('readfile(%q)'):format(sa)
     elseif a:match '%^' then
         -- there may be ^strings
         sa = a:gsub('([^%w)%]])%^([^)%],]+)',function(pre,str)
