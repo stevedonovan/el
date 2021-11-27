@@ -271,7 +271,7 @@ $ el sort {5 2 3 6 1} desc
 Another Lua library function where lambdas are useful is `string.gsub`. The problem is that some log formats just use unadorned UNIX time-stamps, but we turn this into an opportunity to present the data exactly as we want:
 
 ```sh
-$ el ^'%d,%s' time[] ^'A log message' > log.log
+$ el ^'%d,%s' 1636908445 ^'A log message' > log.log
 $ cat log.log
 1636908445,A log message
 $ cat log.log | el gsub it ^'%d+' {t: date ^'%F %T' t}
@@ -447,23 +447,45 @@ Conversions:
   
 Generally useful:
   - `add`,`mul` and `cat` are n-ary functions (for when using the operators is tedious)
+  - `desc` is a _descending_ order compare function...
+  - `read_num` reads a single number from standard input
   - `slice` t,i1,i2 makes a copy of a range of an array
   - `index` t,val - index of val in the array
+  - `index_by` t,ii - result is `{t[i]}` for all `i` in `ii`
+  - `collect` iter - collect an iterator into an array
   - `split` s,re - parts of string separated by delim
   - `map` t,f apply the function `f` and create a new table. Only non-nil values so this is a _filter map_
   - `zipmap` t1,t2(,f) zip two tables together. If `f` is provided, use that instead of `{a,b: {a,b}}`
   - `fields` p.cols,p.delim,p.pat - this parses delimited fields and constructs a table
 
-Some examples. Here we concatenate some items together (`add` and `mul` are useful here!). Then some array operations, using `:` to build up a chain of operations:
+Some examples. Here we concatenate some items together (`add` and `mul` are useful here!).
+Note that `..` is defined on sequence-like tables! 
+Then some array operations, using `:` to build up a chain of operations:
 
 ```sh
 $ el zipmap {1 2 3} {^ one two three} cat
 {"1one","2two","3three"}
-$ el T
-{"one","two","three","four"}
+$ el cat {1 2 3} {4 5 6} {7 8 9} : sort it desc
+{9,8,7,6,5,4,3,2,1}
+$ el set T={^ one two three four}
 $ el index T ^three : slice T it : map it upper
 {"THREE","FOUR"}
+```
+Iterators can be collected into arrays. Of course, the simplest form of an iterator is just a function that returns non-nil, and (hopefully) returns `nil` eventually. So to make an iterator function, make a function that returns such a function. A bit awkward to type so this operation is given the vaguely exciting name `fun`.
 
+```sh
+$ el collect {seq 0 1 0.1}
+{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0}
+$ echo 10 20 30 | el collect read_num
+{10,20,30}
+$ echo 10 20 30 | el {: read_num} do it
+10
+20
+30
+$ echo 10 20 30 | el fun read_num do it
+10
+20
+30
 ```
 
 Here is a `which`, which is made clearer with a few functions:

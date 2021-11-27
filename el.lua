@@ -237,23 +237,29 @@ foldop('add',0,function(acc,v) return acc + v end)
 foldop('mul',1,function(acc,v) return acc * v end)
 foldop('cat','',function(acc,v) return acc .. v end)
 
+local set_call
+
 local call_meta = {
     __call = function(t,k)
         return t[k]
-    end
+    end,
+    __concat = function(t1,t2)
+        local res = slice(t1,1)
+        for i = 1,#t2 do push(res,t2[i]) end
+        return set_call(res)
+    end    
 }
-local function set_call(t)
+
+function set_call(t)
     return setmetatable(t,call_meta)
 end
 
+local function is_list(t)
+    return getmetatable(t) == call_meta
+end
+
 function list(...)
-    local args = {...}
-    if #args == 1 and type(args[1]) == 'table' then
-        -- not quite right --
-        return set_call(args[1])
-    else
-        return set_call(args)
-    end 
+    return set_call({...})
 end
 
 function stop(val)
@@ -550,6 +556,71 @@ function slice(t,i1,i2)
     return res
 end
 
+local first = true
+local push = table.insert
+
+function fold(val,accname,start,op)
+    local acc = g_saved_globals[accname]
+    if first then
+        first = false
+        acc = start
+        set_autosave()
+    end
+    g_saved_globals[accname] = op(acc,val)
+end
+
+function sum(val,accname)
+    return fold(val,accname,0,add)
+end
+
+function index_by(t,arr,keys)
+    local res = {}
+    for i = 1,#arr do
+        local idx = arr[i]
+        local val = t[idx]
+        val = val or null
+        if keys then
+            res[idx] = val
+        else
+            push(res,val)
+        end        
+    end
+    return res
+end
+
+function collect(...)
+    local res = {}
+    for v in ... do
+        push(res,v)
+    end
+    return res
+end
+
+function seqa(...)
+    return collect(seq(...))
+end
+
+function zipmap(t1,t2,op)
+    if not op then
+        op = function(v1,v2) return {v1,v2} end
+    end
+    local res = {}
+    for i = 1,#t1 do
+        res[i] = op(t1[i],t2[i])
+    end
+    return res
+end
+
+function read_num()
+    return io.read('*n')
+end
+
+function fun(f)
+    return function(...)
+        return f(...) 
+    end
+end
+
 function bin(n)
     local t = {}
     for i = 1, 32 do
@@ -641,7 +712,7 @@ function save(tbl)
         if type(k) == 'string' then
             local vt = type(v)
             if vt == 'string' then
-                vs = squote(vs)
+                vs = ('%q'):format(vs)
             elseif vt == 'table' then
                 vs = lua(v)
             elseif vt == 'function' then
@@ -868,7 +939,9 @@ function subexpr(arg,iter)
         end
     end
     -- collect any {..} and apply quote() to them
+    --~ dump('arg1 '..iter,arg)
     arg = collect_subexprs(arg)
+    --~ dump('arg2 '..iter,arg)
     local expr = sub_marker(quote(arg[1]))
     
     -- top-level - allow for output conversions like bin or hex
@@ -893,11 +966,16 @@ function subexpr(arg,iter)
             -- allow multiple values on the top-level using identity function
             implicit = 'eval'
         end 
-    elseif iter == 'subexpr' and not lambda_args then
-        if not is_global_fun(expr) then
-            implicit = 'list'
-        elseif expr == 'eval' then
-            expr = ''
+    elseif iter == 'subexpr' then
+        local global_fun = is_global_fun(expr)
+        if not lambda_args then
+            if not global_fun then
+                implicit = 'list'
+            elseif expr == 'eval' then
+                expr = ''
+            end
+        elseif not global_fun then
+            implicit = 'eval'
         end
     end
     if implicit then
@@ -927,7 +1005,13 @@ function subexpr(arg,iter)
         end
         args[im1] = val
     end
-    if is_global_fun(expr) then
+    if expr == '' and has_vars then
+        expr = 'eval'
+    end
+    if expr == 'list' and has_vars then
+        expr = ''
+    end
+    if is_global_fun(expr) or expr == '' then
         local call
         if has_vars then
             -- key-value pairs as args means collect as single TABLE
@@ -956,9 +1040,12 @@ function subexpr(arg,iter)
         else
             expr = expr..'{'..call..'}'
         end
+        --~ print('+',expr)
     else
         expr = expr .. ' ' .. table.concat(args,' ')
+        --~ dump('-',args)
     end
+    
     if conv then
         expr = conv..'('..expr..')'
     elseif lambda_args then
