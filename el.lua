@@ -975,7 +975,7 @@ function subexpr(arg,iter)
                 expr = ''
             end
         elseif not global_fun then
-            implicit = 'eval'
+            implicit = ''
         end
     end
     if implicit then
@@ -1008,10 +1008,7 @@ function subexpr(arg,iter)
     if expr == '' and has_vars then
         expr = 'eval'
     end
-    if expr == 'list' and has_vars then
-        expr = ''
-    end
-    if is_global_fun(expr) or expr == '' then
+    if is_global_fun(expr) then
         local call
         if has_vars then
             -- key-value pairs as args means collect as single TABLE
@@ -1038,12 +1035,12 @@ function subexpr(arg,iter)
         if not has_vars then
             expr = expr..'('..call..')'
         else
+             -- this is to by-pass the list() function when we have a table containing k-v pairs
+            if expr == 'list' then expr = '' end
             expr = expr..'{'..call..'}'
         end
-        --~ print('+',expr)
     else
         expr = expr .. ' ' .. table.concat(args,' ')
-        --~ dump('-',args)
     end
     
     if conv then

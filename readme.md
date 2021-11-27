@@ -463,6 +463,10 @@ Note that `..` is defined on sequence-like tables!
 Then some array operations, using `:` to build up a chain of operations:
 
 ```sh
+$ el zipmap {1 2 3} {10 20 30} : json it
+[[1,10],[2,20],[3,30]]
+$ el zipmap {1 2 3} {10 20 30} {a,b: x=a y=b} : json it
+[{"y":10,"x":1},{"y":20,"x":2},{"y":30,"x":3}]
 $ el zipmap {1 2 3} {^ one two three} cat
 {"1one","2two","3three"}
 $ el cat {1 2 3} {4 5 6} {7 8 9} : sort it desc
