@@ -457,6 +457,15 @@ function spliti(s,re)
     return iter(split(s,re))
 end
 
+vars = eval
+
+function glob(t)
+    for k,v in pairs(t) do
+        _G[k] = v
+    end
+    return t
+end
+
 local field_names
 
 function fields(parms)
@@ -835,6 +844,10 @@ function collect_subexprs(args)
     push(subexprs,subx)
     for _,arg in ipairs(args) do
         local set, block = arg:match '(.*){(.*)'
+        -- enforce the rule that only an assignment can go before {
+        if set and set ~= '' and not set:match('^[%w_-]+=$') then
+            block = nil
+        end
         if block then
             push(subexprs,subx)
             subx = {list={},prefix=set}
@@ -846,7 +859,7 @@ function collect_subexprs(args)
                 push(subx.list,block)
             end
         end 
-        local endblock,closes = arg:match '^([^}]*)(}+)'
+        local endblock,closes = arg:match '^([^}]*)(}+)$'
         if endblock then
             if #endblock > 0 then
                 push(subx.list,endblock)

@@ -448,6 +448,8 @@ Conversions:
 Generally useful:
   - `add`,`mul` and `cat` are n-ary functions (for when using the operators is tedious)
   - `desc` is a _descending_ order compare function...
+  - `vars` is a useful do-nothing function: `el vars x=10 y=2 : it.x*it.y`
+  - `glob` creates global variables `el global x=10 y=2 : x*y`
   - `read_num` reads a single number from standard input
   - `slice` t,i1,i2 makes a copy of a range of an array
   - `index` t,val - index of val in the array
