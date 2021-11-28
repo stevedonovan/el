@@ -429,7 +429,7 @@ function map(t,fun)
     for i = 1,#t do
         push(res,fun(t[i]))
     end
-    return res
+    return set_call(res)
 end
 
 function split(s,re,buff)
@@ -445,7 +445,7 @@ function split(s,re,buff)
             if #ls == 1 and ls[1] == '' then
                 return {}
             else
-                return ls
+                return set_call(ls)
             end
         end
         push(ls,sub(s,i1,i2-1))
@@ -457,13 +457,12 @@ function spliti(s,re)
     return iter(split(s,re))
 end
 
-vars = eval
+vars = set_call
 
 function glob(t)
     for k,v in pairs(t) do
         _G[k] = v
     end
-    return t
 end
 
 local field_names
@@ -562,7 +561,7 @@ function slice(t,i1,i2)
     for i = i1,i2 do
         push(res,t[i])
     end
-    return res
+    return set_call(res)
 end
 
 local first = true
@@ -594,7 +593,7 @@ function index_by(t,arr,keys)
             push(res,val)
         end        
     end
-    return res
+    return set_call(res)
 end
 
 function collect(...)
@@ -602,7 +601,7 @@ function collect(...)
     for v in ... do
         push(res,v)
     end
-    return res
+    return set_call(res)
 end
 
 function seqa(...)
@@ -617,7 +616,7 @@ function zipmap(t1,t2,op)
     for i = 1,#t1 do
         res[i] = op(t1[i],t2[i])
     end
-    return res
+    return set_call(res)
 end
 
 function read_num()
