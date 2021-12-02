@@ -1,4 +1,4 @@
-#!/usr/bin/lua5.3
+#!/usr/bin/lua54
 -- Flatten ALL those tidy tables and add environment lookup
 
 local saved_globals = {}
@@ -35,6 +35,17 @@ function set_autosave()
     auto_save = true
 end
 
+-- Lua 5.4
+if not bit32 then
+  bit32 = {}
+  function bit32.band(b1,b2) return b1 & b2 end
+  function bit32.bor(b1,b2) return b1 | b2 end
+  function bit32.bxor(b1,b2) return b1 ~ b2 end
+  function bit32.bnot(b) return ~b  end
+  function bit32.rshift(b,n) return b >> n end
+  function bit32.lshift(b,n) return b << n end
+end
+
 function set_global_lookup()
     tables = {math,io,os,string,bit32,table,saved_globals}
     g_saved_globals = saved_globals
@@ -49,11 +60,23 @@ function set_global_lookup()
     })
 end
 
+local simple_patterns = {WORD = '(%S+)', DIGIT = '(%d+)', REST = '(.+)'}
+
+function massage_pattern(patt)
+    return patt:gsub('%f[%a](%u+)%f[%A]',simple_patterns)
+end
+
 ------ some useful functions at your fingertips ----
 --- some globals need their return values massaged a bit
 gsub = function(s,p,r)
+    p = massage_pattern(p)
     local res = s:gsub(p,r)
     return res
+end
+
+match = function(s,p)
+    p = massage_pattern(p)
+    return s:match(p)
 end
 
 insert = function(t,p,e)
@@ -119,8 +142,13 @@ function printx(...)
                 io.write(ELSEP)
             end 
         end
-        print() 
+        print()
     end
+end
+
+function put(...)
+    printx(...)
+    return ...
 end
 
 function seq(i1,i2,inc)
@@ -299,14 +327,36 @@ function readf(f)
     return res
 end
 
-function readfile(sa)
+function openf(sa)
     local f
     if sa == '-' or sa == 'stdin' then
         f = io.stdin
     else
         f = assert(io.open(expand_home(sa)))
     end
-    return readf(f)
+    return f
+end
+
+function readfile(sa)
+    return readf(openf(sa))
+end
+
+function line_n(sa,n)
+    local f,i = openf(sa),0
+    for line in f:lines() do
+        --print(line,n,i)
+        i = i + 1
+        if i == n then
+            --f:close()
+            return line
+        end
+    end
+    f:close()
+    return nil
+end
+
+function line(n)
+    return line_n('stdin',n or 1)
 end
 
 local function has_space(s)
@@ -645,7 +695,7 @@ function hex(n)
     return ('%X'):format(n)
 end
 
-local _conversions = {bin = true, hex = true, stop=true, json = false}
+local _conversions = {bin = true, hex = true, stop=true, put=true, json = false}
 
 function bin2int(s)
     local res = 0
@@ -1095,7 +1145,7 @@ function main(arg)
     if #rest > 0 then
         subx = 'local '
         while #rest > 0 do
-            local cexpr = subexpr(cexpra)
+            local cexpr = subexpr(cexpra,'expr')
             subx = subx .. 'it='..cexpr..'\nif not it then goto fin end\n'
             cexpra,rest = split2(rest,':')
         end
