@@ -1,4 +1,4 @@
-#!/usr/bin/lua54
+#!/usr/bin/lua
 -- Flatten ALL those tidy tables and add environment lookup
 
 local saved_globals = {}
@@ -856,9 +856,16 @@ function split_key_val(a)
     return a,var
 end
 
+local stringer = '^'
+if os.getenv('EL_AT') then
+    stringer = '@'
+end
+local string_arg = '^%'..stringer..'(.*)$'
+local string_inter = '([^%w)%]])%'..stringer..'([^)%],]+)' 
+
 function quote(a)
     -- help with quoting strings
-    local sa = a:match '^%^(.*)$'
+    local sa = a:match(string_arg)
     if sa then
         return squote(sa)
     end
@@ -866,9 +873,9 @@ function quote(a)
     sa = a:match '^@(.+)'
     if sa then
         return ('readfile(%q)'):format(sa)
-    elseif a:match '%^' then
+    elseif a:match(stringer) then
         -- there may be ^strings
-        sa = a:gsub('([^%w)%]])%^([^)%],]+)',function(pre,str)
+        sa = a:gsub(string_inter,function(pre,str)
             return pre .. squote(str)
         end)
     end
@@ -963,8 +970,11 @@ function is_conv_fun(expr)
     return is_global_fun(expr) and _conversions[expr]
 end
 
+local string_fun = '^(.+)'..stringer..'$'
+local string_name = '^(%a[%w_]*)'..stringer..'$'
+
 function is_iterator_fun(expr)
-    local name = expr:match('^(.+)%^$')
+    local name = expr:match(string_fun)
     if name then expr = name end
     return is_global_fun(expr) and _iterators[expr]
 end
@@ -986,10 +996,10 @@ function subexpr(arg,iter)
         return '{}'
     end
     -- strip off the ^ prefix indicating 'quote following args'
-    if arg[1] == '^' and iter == 'subexpr' then
-        arg[1] = 'list^' -- for people in a hurry
+    if arg[1] == stringer and iter == 'subexpr' then
+        arg[1] = 'list'..stringer -- for people in a hurry
     end
-    local quoted_fun = arg[1]:match('^(%a[%w_]*)%^$')
+    local quoted_fun = arg[1]:match(string_name)
     if quoted_fun then
         arg[1] = quoted_fun
     end
@@ -1002,9 +1012,7 @@ function subexpr(arg,iter)
         end
     end
     -- collect any {..} and apply quote() to them
-    --~ dump('arg1 '..iter,arg)
     arg = collect_subexprs(arg)
-    --~ dump('arg2 '..iter,arg)
     local expr = sub_marker(quote(arg[1]))
     
     -- top-level - allow for output conversions like bin or hex
