@@ -513,6 +513,7 @@ function glob(t)
     for k,v in pairs(t) do
         _G[k] = v
     end
+    return t
 end
 
 local field_names

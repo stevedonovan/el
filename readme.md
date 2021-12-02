@@ -444,13 +444,15 @@ There are some useful iterators:
 Conversions:
   - `bin` renders as binary, least signicant bit first
   - `hex` renders as hexadecimal
+  - `put` writes out as usual, but returns the value - useful for printing intermediate results
   
 Generally useful:
   - `add`,`mul` and `cat` are n-ary functions (for when using the operators is tedious)
   - `desc` is a _descending_ order compare function...
   - `vars` is a useful do-nothing function: `el vars x=10 y=2 : it.x*it.y`
-  - `glob` creates global variables `el global x=10 y=2 : x*y`
+  - `glob` creates global variables `el glob x=10 y=2 : x*y`
   - `read_num` reads a single number from standard input
+  - `line` reads a given line
   - `slice` t,i1,i2 makes a copy of a range of an array
   - `index` t,val - index of val in the array
   - `index_by` t,ii - result is `{t[i]}` for all `i` in `ii`
@@ -530,6 +532,23 @@ $ echo '10,20,30' | el fields cols=^'x,y,z' delim=^, it : it.x*it.y
 $ echo 'hello(dolly)' | el fields pat=^'(%a+)%((%a+)%)' cols=^'greeting,name' it
 {greeting="hello",name="dolly"}
 ```
+
+Sometimes we need to perform an operation on a particular line of input:
+
+```sh
+$ ifconfig wlo1 | el line 2 : match it ^'inet WORD'
+192.168.1.67
+```
+`line` gives you the given line of standard input - the default is the first line.
+
+Can continue to do this, but remember that some of the input has already been read, so the second `line` here just gets the next line.
+
+```sh
+$ cat text.txt | el line 2 : put match it ^'line WORD' : line : match it ^'sentence WORD'
+from
+scrawled
+```
+This is a cool idiom for doing multi-line matches.
 
 ## Appendix II Some Trickery Used to Prepare this Entertainment
 
