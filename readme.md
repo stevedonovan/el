@@ -550,6 +550,37 @@ scrawled
 ```
 This is a cool idiom for doing multi-line matches.
 
+However, it's not easy to *collect* the results. For that, `multimatch`. The problem is that `ip addr` produces appalling output, and we want to collect the names and IP addresses of the devices.
+
+```sh
+$ ip addr | el multimatch it ^'DIGIT: WORD:' ^'inet6* WORD?'
+{"1","lo","127.0.0.1/8"}
+{"2","enp0s25"}
+{"3","wlo1","192.168.1.67/24"}
+{"4","br-0efaa7b4f508","172.20.0.1/16"}
+{"5","docker0","172.17.0.1/16"}
+{"6","br-a4f048baa9de","172.19.0.1/16"}
+{"7","br-de7fdfccc0e7","172.18.0.1/16"}
+```
+
+So, we first match '3: wlo1' and get the name, and we start matching with the next pattern, which picks up the `inet 192.168.1.67/24` a few lines down - and then we're finished.
+
+But no IP address for 'enp0s25'? Well, it's not connected to anything. This is why there is a mysterious question mark at the end of the second pattern. Think of it as a simple higher-level pattern `ab?` where `a` and `b` are Lua string patterns. We abandon the search for 'enp0s25' since we find '3: wlo1:'. 
+
+Want result as nice JSON objects? 
+
+```sh
+$ ip addr | el multimatch it ^'DIGIT: WORD:' ^'inet6* WORD?' : json fields it cols=^'no,dev,ip'
+{"ip":"127.0.0.1/8","dev":"lo","no":1}
+{"no":2,"dev":"enp0s25"}
+{"ip":"192.168.1.67/24","dev":"wlo1","no":3}
+{"ip":"172.20.0.1/16","dev":"br-0efaa7b4f508","no":4}
+{"ip":"172.17.0.1/16","dev":"docker0","no":5}
+{"ip":"172.19.0.1/16","dev":"br-a4f048baa9de","no":6}
+{"ip":"172.18.0.1/16","dev":"br-de7fdfccc0e7","no":7} 
+```
+`fields` will work with an *existing* array and make up an object using column names.
+
 ## Appendix II Some Trickery Used to Prepare this Entertainment
 
 ### Metatable Madness

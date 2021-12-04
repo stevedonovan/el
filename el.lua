@@ -5,6 +5,7 @@ local saved_globals = {}
 local bin2int,this_table,debug
 local auto_save, print_newline, return_code
 local push,pop = table.insert,table.remove
+local set_call
 
 local function squote(s)
     return '\''..s..'\''
@@ -62,7 +63,7 @@ end
 
 local not_massaging = os.getenv("EL_NO_PAT_MASSAGE")
 
-local simple_patterns = {WORD = '(%S+)', DIGIT = '(%d+)', REST = '(.+)'}
+local simple_patterns = {WORD = '(%S+)', DIGIT = '(%d+)', REST = '(.+)', IDEN = '(%a[%w_]*)'}
 
 local function massage_pattern(patt)
     if not_massaging then return patt end
@@ -80,25 +81,43 @@ match = function(s,p)
     return s:match(massage_pattern(p))
 end
 
-local ipat,mmatch_res,patterns = 1,{}
+local ipat,mmatch_res,patterns,patterns_kind = 1,{}
 
 local function mmatch_reset()
     ipat = 1
     local res = mmatch_res
     mmatch_res = {}
-    return res
+    return set_call(res)
+end
+
+local function remove_trailing_question(a)
+    local trailing = false
+    if a:match('%?$') then
+        a = a:sub(1,#a-1)
+        trailing = true
+    end
+    return a, trailing
 end
 
 function multimatch (s,...)
+    local res
     if s == nil then -- finally finished - return what we have collected (if any)
         return mmatch_reset()
     end
     if not patterns then
        local args = {...}
+       patterns_kind = {}
        patterns = {}
        for i = 1,#args do
-          patterns[i] = massage_pattern(args[i])
+          local patt,question = remove_trailing_question(args[i])
+          patterns[i] = massage_pattern(patt)
+          patterns_kind[i] = question
        end
+    end
+    if patterns_kind[ipat] and ipat > 1 then
+        if s:match(patterns[1]) then -- we ended prematurely...
+            res = mmatch_reset()
+        end -- and let's start the next...
     end
     local caps = {s:match(patterns[ipat])}
     if #caps > 0 then -- keep collecting
@@ -106,8 +125,9 @@ function multimatch (s,...)
         ipat = ipat + 1
     end
     if ipat > #patterns then -- until we run out of patterns
-        return mmatch_reset()
+        res = mmatch_reset()
     end
+    return res
 end
 
 insert = function(t,p,e)
@@ -302,8 +322,6 @@ end
 foldop('add',0,function(acc,v) return acc + v end)
 foldop('mul',1,function(acc,v) return acc * v end)
 foldop('cat','',function(acc,v) return acc .. v end)
-
-local set_call
 
 local call_meta = {
     __call = function(t,k)
