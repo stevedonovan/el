@@ -893,25 +893,28 @@ function split_key_val(a)
     return a,var
 end
 
-local stringer = '^'
+local stringer,filer = '^','@'
 if os.getenv('EL_AT') then
     stringer = '@'
+    filer = '@@'
 end
 local string_arg = '^%'..stringer..'(.*)$'
-local string_inter = '([^%w)%]])%'..stringer..'([^)%],]+)' 
+local string_inter = '([^%w)%]])%'..stringer..'([^)%],]+)'
+local file_arg = '^'..filer..'(.+)'
 
 function quote(a)
+    -- an argment may be @file
+    local sa = a:match(file_arg)
+    if sa then
+        return ('readfile(%q)'):format(sa)
+    end
     -- help with quoting strings
-    local sa = a:match(string_arg)
+    sa = a:match(string_arg)
     if sa then
         return squote(sa)
     end
-    -- an argment may be @file
-    sa = a:match '^@(.+)'
-    if sa then
-        return ('readfile(%q)'):format(sa)
-    elseif a:match(stringer) then
-        -- there may be ^strings
+    if a:match(stringer) then
+        -- there may be embedded ^strings
         sa = a:gsub(string_inter,function(pre,str)
             return pre .. squote(str)
         end)
