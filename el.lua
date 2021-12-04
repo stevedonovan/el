@@ -1,4 +1,4 @@
-#!/usr/bin/lua
+#!/usr/bin/lua54
 -- Flatten ALL those tidy tables and add environment lookup
 
 local saved_globals = {}
@@ -60,23 +60,54 @@ function set_global_lookup()
     })
 end
 
+local not_massaging = os.getenv("EL_NO_PAT_MASSAGE")
+
 local simple_patterns = {WORD = '(%S+)', DIGIT = '(%d+)', REST = '(.+)'}
 
-function massage_pattern(patt)
+local function massage_pattern(patt)
+    if not_massaging then return patt end
     return patt:gsub('%f[%a](%u+)%f[%A]',simple_patterns)
 end
 
 ------ some useful functions at your fingertips ----
 --- some globals need their return values massaged a bit
 gsub = function(s,p,r)
-    p = massage_pattern(p)
-    local res = s:gsub(p,r)
+    local res = s:gsub(massage_pattern(p),r)
     return res
 end
 
 match = function(s,p)
-    p = massage_pattern(p)
-    return s:match(p)
+    return s:match(massage_pattern(p))
+end
+
+local ipat,mmatch_res,patterns = 1,{}
+
+local function mmatch_reset()
+    ipat = 1
+    local res = mmatch_res
+    mmatch_res = {}
+    return res
+end
+
+function multimatch (s,...)
+    if s == nil then -- finally finished - return what we have collected (if any)
+        return mmatch_reset()
+    end
+    if not patterns then
+       local args = {...}
+       patterns = {}
+       for i = 1,#args do
+          patterns[i] = massage_pattern(args[i])
+       end
+    end
+    local caps = {s:match(patterns[ipat])}
+    if #caps > 0 then -- keep collecting
+        extend(mmatch_res, caps)
+        ipat = ipat + 1
+    end
+    if ipat > #patterns then -- until we run out of patterns
+        return mmatch_reset()
+    end
 end
 
 insert = function(t,p,e)
@@ -103,12 +134,16 @@ write = function(...)
     print_newline = true
 end
 
-function append(t,...)
-    for _,v in ipairs{...} do
-        push(t,v)
+function extend(t1,t2)
+   for _,v in ipairs(t2) do
+        push(t1,v)
     end
+    return t1
+end
+
+function append(t,...)
     auto_save = true
-    return t
+    return extend(t,{...})
 end
 
 function first(s)
@@ -532,8 +567,10 @@ function fields(parms)
     local splitted
     if pat then
         splitted = {line:match(pat)}
-    else
+    elseif delim then
         splitted = split(line,delim)
+    else
+        splitted = line
     end 
     for i = 1,#splitted do
         local v = splitted[i]
