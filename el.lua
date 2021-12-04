@@ -3,7 +3,7 @@
 
 local saved_globals = {}
 local bin2int,this_table,debug
-local auto_save, print_newline
+local auto_save, print_newline, return_code
 local push,pop = table.insert,table.remove
 
 local function squote(s)
@@ -165,6 +165,9 @@ function printx(...)
     end
     if not_nil then
         local n = #args
+        if n == 1 and args[1] == false then
+            return_code = 1
+        end
         for i = 1,n do
             local a = args[i]
             if type(a) == 'table' then
@@ -456,6 +459,10 @@ function exec(name,...)
     if debug then
         print('cmd',cmd)
     end
+    return shell(cmd)
+end
+
+function shell(cmd)
     local res = readf(assert(io.popen(cmd,'r'))):gsub('%s+$','')
     return res
 end
@@ -733,7 +740,7 @@ function hex(n)
     return ('%X'):format(n)
 end
 
-local _conversions = {bin = true, hex = true, stop=true, put=true, json = false}
+local _conversions = {bin = true, hex = true, stop=true, put=true, json = true}
 
 function bin2int(s)
     local res = 0
@@ -1007,6 +1014,9 @@ function is_global_fun(expr)
 end
 
 function is_conv_fun(expr)
+    if expr == 'not' then
+        return true
+    end
     return is_global_fun(expr) and _conversions[expr]
 end
 
@@ -1155,7 +1165,11 @@ function subexpr(arg,iter)
     end
     
     if conv then
-        expr = conv..'('..expr..')'
+        if conv == 'not' then
+            expr = conv..' '..expr
+        else
+            expr = conv..'('..expr..')'
+        end
     elseif lambda_args then
         expr = 'function('..lambda_args..') return '..expr..' end'
     end
@@ -1239,6 +1253,9 @@ function main(arg)
     end
     if print_newline then
         print()
+    end
+    if return_code then
+        os.exit(return_code)
     end
 end
 
