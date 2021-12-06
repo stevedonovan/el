@@ -7,6 +7,10 @@ local auto_save, print_newline, return_code
 local push,pop = table.insert,table.remove
 local set_call
 
+packs,unpacks=string.pack,string.unpack
+pack,unpack=table.pack,table.unpack
+space,lf,tab = ' ','\n','\t'
+
 local function squote(s)
     return '\''..s..'\''
 end 
@@ -67,7 +71,7 @@ local simple_patterns = {WORD = '(%S+)', DIGIT = '(%d+)', REST = '(.+)', IDEN = 
 
 local function massage_pattern(patt)
     if not_massaging then return patt end
-    return patt:gsub('%f[%a](%u+)%f[%A]',simple_patterns)
+    return (patt:gsub('%f[%a](%u+)%f[%A]',simple_patterns))
 end
 
 ------ some useful functions at your fingertips ----
@@ -538,6 +542,17 @@ function map(t,fun)
     local res = {}
     for i = 1,#t do
         push(res,fun(t[i]))
+    end
+    return set_call(res)
+end
+
+function pairmap(t,fun,x)
+    local res = {}
+    for i = 1,#t do
+        local k,v = fun(t[i],x)
+        if k ~= nil then
+            res[k] = v
+        end
     end
     return set_call(res)
 end
