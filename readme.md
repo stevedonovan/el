@@ -63,15 +63,17 @@ function normal(x,sig,mean)
   return 1.0/(sig*spi) * math.exp(-0.5*((x - mean)/sig)^2)
 end
 ```
-There is now a `dofile("/home/steve/dev/simple.lua")` in `~/.el` and so it is available globally. (Scary shit, but worse things live in '~')
 
 ```sh
-$ el set add_file=^normal.lua
+$ el set add_file=^ex/normal.lua
 $ el normal 11 0.5 10
 0.10798193302638
 $ el normal mean=10 sig=0.5 val=11
 0.10798193302638
 ```
+
+There is now a `dofile("/home/steve/dev/el/ex/simple.lua")` in `~/.el` and so it is available globally. (Scary shit, but worse things live in '~')
+
 The implicit table feature makes named arguments straightforward. The testing workflow is editing the file and exercising the functions using `el`.
 
 Can also bring in Lua modules:
@@ -107,6 +109,8 @@ $ el bin band b011 b010
 01
 ```
 This convention saves us from having to say `bin {band b011 b010}` when applying an output conversion.
+
+(These functions were retired in 5.4 in favour of operators, but `el` defines them if not found)
 
 Here we print out the bits of a byte:
 
@@ -160,10 +164,10 @@ Note the important space after `*.lua` for the shell expansion to work!
 
 In the special case of subexprs, `{^ one two}` is the shortcut for `{list^ one two}`.
 
-Also (borrowed from the convention set by `curl` and others) a file may be directly read in as a string using `@filename`. The special filename `stdin` means 'read standard input'.
+Also (borrowed from the convention set by `curl` and others) a file may be directly read in as a string using `@filename`. The special filename `stdin` means 'read standard input' (`lf` is a convenient global so we don't have to type the awkward `^'\n'`)
 
 ```sh
-$ el split @text.txt ^'\n'
+$ el split @data/text.txt lf
 {"Normally text isn't as interesting","as a line from a poem,","or a sentence scrawled in lipstick","on the bathroom mirror"}
 ```
 
@@ -242,11 +246,29 @@ $ el json {a=1 b=1.5}
 ```
 Here the implicit function is `list`.
 
-These implicit functions kick in when the expression does not start with a _known global function_. Can always use `eval` to force a subexpression to evaluate as an actual expression, not a list:
+These implicit functions kick in when the expression does not start with a _known global function_.
+
+With this release, these colon-separated 'steps' can be used in more contexts. For instance, can have steps that initialize the loop:
 
 ```sh
-$ el 10 do printf {eval it%2==0 and ^'%ws ' or ^'%rs '} it
-``` 
+$ el let k=0 N=10 : 1 N do let k=k+it
+{k=1}
+{k=3}
+{k=6}
+{k=10}
+{k=15}
+{k=21}
+{k=28}
+{k=36}
+{k=45}
+{k=55}
+```
+Often we just want the final result, so it's now possible to put final expressions after the loop with the `end` keyword:
+
+```sh
+$ el let k=0 N=1000 : 1 N do let k=k+it end k
+500500
+```
 
 ## Lambdas and User-Defined Functions
 
@@ -274,7 +296,7 @@ Another Lua library function where lambdas are useful is `string.gsub`. The prob
 $ el ^'%d,%s' 1636908445 ^'A log message' > log.log
 $ cat log.log
 1636908445,A log message
-$ cat log.log | el gsub it ^'%d+' {t: date ^'%F %T' t}
+$ cat log.log | el gsub L ^'%d+' {t: date ^'%F %T' t}
 2021-11-14 18:47:25,A log message
 ```
 
@@ -285,21 +307,38 @@ $ el set f={y: {x: x+y}}
 $ el f[10][20]
 30
 $ el set tstamp={fmt: {t: date fmt t}}
-$ cat log.log | el gsub it ^'%d+' tstamp[^'%F %T']
+$ cat log.log | el gsub L ^'%d+' tstamp[^'%F %T']
 2021-11-14 18:47:25,A log message
 ```
+
+Multiple steps in subexpressions make lambdas more flexible:
+
+```sh
+~/dev/el$ el set services={: tinyyaml.parse @docker-compose.yaml : mapma it.services}
+~/dev/el$ el services do it.image
+zookeeper:${ZOOKEEPER_VERSION}
+docker.elastic.co/elasticsearch/elasticsearch-oss:${ELASTICSEARCH_VERSION}
+wurstmeister/kafka:${KAFKA_VERSION}
+docker.elastic.co/logstash/logstash-oss:${LOGSTASH_VERSION}
+nginx:${NGINX_VERSION}
+bobrik/curator:${CURATOR_VERSION}
+docker.elastic.co/kibana/kibana-oss:${KIBANA_VERSION}
+mongo:${MONGODB_VERSION}
+bobrik/curator:${CURATOR_VERSION}
+```
+`it.services` is a map of all the services, so we make it an array. Arrays are automatically iterable.
 
 ## Filtering Text
 
 Filters are an important part of the shell experience, and I wanted `el` to be useful in shell pipelines.
 
 ```
-$ cat text.txt
+$ cat data/text.txt
 Normally text isn't as interesting
 as a line from a poem,
 or a sentence scrawled in lipstick
 on the bathroom mirror
-$ cat text.txt | el lines do sub it 1 6
+$ cat data/text.txt | el lines do sub it 1 6
 Normal
 as a l
 or a s
@@ -310,17 +349,17 @@ There's no magic here: `io.lines()` and `string.sub()`, in their informal, first
 There is another special variable, `row`, which increments from 1 to n over the input:
 
 ```sh
-$ cat text.txt | el lines do ^'%02d %s' row it
+$ cat data/text.txt | el lines do ^'%02d %s' row it
 01 Normally text isn't as interesting
 02 as a line from a poem,
 03 or a sentence scrawled in lipstick
 04 on the bathroom mirror
 ```
 
-`lines do` is common to all filters over input lines, so there is yet another implicit; if the expression contains that special variable `it` then the loop is over all lines:
+`lines do` is common to all filters over input lines, so there is yet another implicit; if the expression contains that special variable `L` then the loop is over all lines:
 
 ```sh
-$ cat text.txt | el sub it 0 6
+$ cat data/text.txt | el sub L 0 6
 Normal
 as a l
 or a s
@@ -329,18 +368,18 @@ on the
 There is a postfix `if`, allowing yet another re-invention of `grep` (note the double '^^')
 
 ```sh
-$ cat text.txt | el it if match it ^^or
+$ cat data/text.txt | el L if match L ^^or
 or a sentence scrawled in lipstick
 ```
 But this is _an expression_, so we can make more involved queries without going blind trying to write complicated regexes:
 
 ```sh
-$ cat text.txt | el it if {match it ^a} and {match it ^poem}
+$ cat data/text.txt | el L if {match L ^a} and {match L ^poem}
 as a line from a poem,
 ```
 (My tests currently involve a one-liner to collect all the commands in this file:
 ```sh
-cat readme.md | el match it ^'^%$ (.+)' > test.sh
+cat readme.md | el match L ^'^%$ (.+)' > test.sh
 ```
 )
 
@@ -348,240 +387,11 @@ cat readme.md | el match it ^'^%$ (.+)' > test.sh
 
 This started as a calculator-itch and ended up scratching something more interesting: mostly (as an over-generalization) shells are nasty programming languages and vice versa. So we take Lua and make it easier to write once-off expressions. The coding styles appropriate for applications (e.g. 'global-free' for Lua) doesn't apply in console golfing. 'Type-ability' is a thing, and the punctuation in 'match("hello dolly","^hell")' slows us down and seems tiring. (At least subjectively, and that is sufficient for me now). In the context of programming, typing is a not an important part of total effort, but shells are about typing fast and accurately.
 
-There are two kinds of implicits going on in `el` - one is eliding common functions in context, such as `seq`, `format` and `list`. The other is where we look for a particular, special var `it` and assume it must be looped (which is very AWK-ish, another favourite tool of mine). There is an implicit table constructor where a key-value argument makes the rest of the arguments collected as a table. That could be a little surprising, I will grant you. But these are just experiments in a certain design space - it is hard to evaluate a feature without an implementation, and it is certainly no fun. I grant you that I am laying on the special sauce a little thick sometimes, but it is all optional.
+There are two kinds of implicits going on in `el` - one is eliding common functions in context, such as `seq`, `format` and `list`. The other is where we look for a particular, special var `L` and assume it must be looped (which is very AWK-ish, another favourite tool of mine). There is an implicit table constructor where a key-value argument makes the rest of the arguments collected as a table. That could be a little surprising, I will grant you. But these are just experiments in a certain design space - it is hard to evaluate a feature without an implementation, and it is certainly no fun. I grant you that I am laying on the special sauce a little thick sometimes, but it is all optional.
 
 The implementation itself is a fevered hot mess of string patterns and substitutions, but the great thing about Itch Research is that a bad implementation is sufficient to demonstrate ideas enough to show whether they are bad, good or merely meh. There is no point in spending weeks doing a formal grammar and parser if the idea itself is not useful to more than a handful of people. But it means that things are rough and the error handling is poor.
 
-## Appendix I: Useful Global Functions Available
-
-We inject all the functions available in `math,io,os,string,bit32,table`, but some functions are adjusted. A chain of expressions is better than a seriously nested set of function invocations.
-
-Note that the format string passed to `format` and `printf` is specially massaged: '%rs' means 'print this string in red' and '%b00d' is 'print this integer with blue'. These are available `{r=red, g=green, y=yellow, b=blue, m=magenta, c=cyan, w=white}`. (This of course needs support for ANSI codes, which even _Windows_ does these days). There is a global `paint` which is a paint factory: `paint.r` is a function that colours its argument.
-
-  - `len` is redefined in terms of `#t`
-  - `gsub` returns only the string
-  - `insert` also sets `auto_save`
-  - `sort` returns the table
-  - `write` sets `print_newline` flag so `el` ends with a newline
-  - `append` like `insert` except _multiple_ values can be pushed, and `auto_save` is set
-  - `first` return the non-whitespace start of a string (replaces the clunky `awk '{print $1}'`)
-  - `printf` just `write(format(fmt,...))`
-  - `json` render a value as JSON
-  - `lua` render a value in Lua format
-  - `exec` collect arguments together and run as shell. Any map-like key-value pairs become flags, and if the value is an array, it represents multiple flags.
-  - `get`,`post` wrappers around `curl` that use `exec`
-  
-  
-```sh
-$ el set T={}
-$ el append T 10 : sort it
-{10}
-$ el append T 2 : sort it
-{2,10}
-$ el append T 15 : sort it
-{2,10,15}
-$ el exec^ echo 'hello world'
-hello world
-```
-
-The `curl` wrappers exploit `el`'s table constructors. Here we use the excellent `httpbin` to test our queries. In the first case to save us from writing out query vars (and *escaping* them) and second to pass up some JSON to a server directly:
-
-```sh
-scratch$ export URL=https://httpbin.org
-scratch$ el get query={a=23 hello=^dolly} ^/anything
-{
-  "args": {
-    "a": "23", 
-    "hello": "dolly"
-  }, 
-  "data": "", 
-  "files": {}, 
-  "form": {}, 
-  "headers": {
-    "Accept": "*/*", 
-    "Host": "httpbin.org", 
-    "User-Agent": "curl/7.58.0", 
-    "X-Amzn-Trace-Id": "Root=1-6195f3b3-31aa5b0945538df91eb19a2d"
-  }, 
-  "json": null, 
-  "method": "GET", 
-  "origin": "197.91.187.145", 
-  "url": "https://httpbin.org/anything?hello=dolly&a=23"
-}
-
-scratch$ el post data={one=1 two=2} headers={one=^first two=^second} ^/anything 
-{
-  "args": {}, 
-  "data": "{\"one\":1,\"two\":2}", 
-  "files": {}, 
-  "form": {}, 
-  "headers": {
-    "Accept": "*/*", 
-    "Content-Length": "17", 
-    "Content-Type": "application/json", 
-    "Host": "httpbin.org", 
-    "One": "first", 
-    "Two": "second", 
-    "User-Agent": "curl/7.58.0", 
-    "X-Amzn-Trace-Id": "Root=1-61960805-282af85d44fb514577e47615"
-  }, 
-  "json": {
-    "one": 1, 
-    "two": 2
-  }, 
-  "method": "POST", 
-  "origin": "197.91.187.145", 
-  "url": "https://httpbin.org/anything"
-}
-```
-  
-There are some useful iterators:
-  - `seq` i1,i2,inc - `inc` defaults to 1, and if no `i2` the range is 1 .. `i1`
-  - `iter` t returns each value of a table sequence
-  - `items` takes an arbitrary number of arguments and iterates over them
-  - `spliti` s,re  - parts of string separated by delim
-  
-Conversions:
-  - `bin` renders as binary, least signicant bit first
-  - `hex` renders as hexadecimal
-  - `put` writes out as usual, but returns the value - useful for printing intermediate results
-  
-Generally useful:
-  - `add`,`mul` and `cat` are n-ary functions (for when using the operators is tedious)
-  - `desc` is a _descending_ order compare function...
-  - `vars` is a useful do-nothing function: `el vars x=10 y=2 : it.x*it.y`
-  - `glob` creates global variables `el glob x=10 y=2 : x*y`
-  - `read_num` reads a single number from standard input
-  - `line` reads a given line
-  - `slice` t,i1,i2 makes a copy of a range of an array
-  - `index` t,val - index of val in the array
-  - `index_by` t,ii - result is `{t[i]}` for all `i` in `ii`
-  - `collect` iter - collect an iterator into an array
-  - `split` s,re - parts of string separated by delim
-  - `map` t,f apply the function `f` and create a new table. Only non-nil values so this is a _filter map_
-  - `zipmap` t1,t2(,f) zip two tables together. If `f` is provided, use that instead of `{a,b: {a,b}}`
-  - `fields` p.cols,p.delim,p.pat - this parses delimited fields and constructs a table
-
-Some examples. Here we concatenate some items together (`add` and `mul` are useful here!).
-Note that `..` is defined on sequence-like tables! 
-Then some array operations, using `:` to build up a chain of operations:
-
-```sh
-$ el zipmap {1 2 3} {10 20 30} : json it
-[[1,10],[2,20],[3,30]]
-$ el zipmap {1 2 3} {10 20 30} {a,b: x=a y=b} : json it
-[{"y":10,"x":1},{"y":20,"x":2},{"y":30,"x":3}]
-$ el zipmap {1 2 3} {^ one two three} cat
-{"1one","2two","3three"}
-$ el cat {1 2 3} {4 5 6} {7 8 9} : sort it desc
-{9,8,7,6,5,4,3,2,1}
-$ el set T={^ one two three four}
-$ el index T ^three : slice T it : map it upper
-{"THREE","FOUR"}
-```
-Iterators can be collected into arrays. Of course, the simplest form of an iterator is just a function that returns non-nil, and (hopefully) returns `nil` eventually. So to make an iterator function, make a function that returns such a function. A bit awkward to type so this operation is given the vaguely exciting name `fun`.
-
-```sh
-$ el collect {seq 0 1 0.1}
-{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0}
-$ echo 10 20 30 | el collect read_num
-{10,20,30}
-$ echo 10 20 30 | el {: read_num} do it
-10
-20
-30
-$ echo 10 20 30 | el fun read_num do it
-10
-20
-30
-```
-
-Here is a `which`, which is made clearer with a few functions:
-
-```sh
-$ el split PATH ^: : map it {p: open['p.."/go"'] and p}
-{"/home/steve/sdk/go1.16.3/bin"}
-$ el set join={p1,p2: p1 .. ^'/' .. p2}
-$ el set exists={p: open[p] and p}
-$ el split PATH ^: : map it {p: exists join[p,^go]}
-{"/home/steve/sdk/go1.16.3/bin/go"}
-```
-The result is a table; this is more elegant:
-
-```sh
-$ el spliti PATH ^: do exists {join it ^go}
-/home/steve/sdk/go1.16.3/bin/go
-```
-It goes beyond the usual `which` since it will find all occurances, not the first. Sometimes you really don't wish to go any further through some enormous file:
-
-```sh
-$ cat text.txt | el stop it if row==2
-as a line from a poem,
-```
-
-`stop` prints out its value and exits with zero, if the value is truthy (not nil or false). It is considered an output conversion so we get the nice flat statement sugar. It is but an experiment; I suspect there is a more general mechanism lurking behind it.
-
-`fields` is useful for processing structured data like CSV. Note that it is very convenient
-to use the table-as-argument trick to get named parameters. 
-
-```sh
-$ echo '10,20,30' | el fields cols=^'x,y,z' delim=^, it
-{x=10,y=20,z=30}
-$ echo '10,20,30' | el fields cols=^'x,y,z' delim=^, it : it.x*it.y
-200
-$ echo 'hello(dolly)' | el fields pat=^'(%a+)%((%a+)%)' cols=^'greeting,name' it
-{greeting="hello",name="dolly"}
-```
-
-Sometimes we need to perform an operation on a particular line of input:
-
-```sh
-$ ifconfig wlo1 | el line 2 : match it ^'inet WORD'
-192.168.1.67
-```
-`line` gives you the given line of standard input - the default is the first line.
-
-Can continue to do this, but remember that some of the input has already been read, so the second `line` here just gets the next line.
-
-```sh
-$ cat text.txt | el line 2 : put match it ^'line WORD' : line : match it ^'sentence WORD'
-from
-scrawled
-```
-This is a cool idiom for doing multi-line matches.
-
-However, it's not easy to *collect* the results. For that, `multimatch`. The problem is that `ip addr` produces appalling output, and we want to collect the names and IP addresses of the devices.
-
-```sh
-$ ip addr | el multimatch it ^'DIGIT: WORD:' ^'inet6* WORD?'
-{"1","lo","127.0.0.1/8"}
-{"2","enp0s25"}
-{"3","wlo1","192.168.1.67/24"}
-{"4","br-0efaa7b4f508","172.20.0.1/16"}
-{"5","docker0","172.17.0.1/16"}
-{"6","br-a4f048baa9de","172.19.0.1/16"}
-{"7","br-de7fdfccc0e7","172.18.0.1/16"}
-```
-
-So, we first match '3: wlo1' and get the name, and we start matching with the next pattern, which picks up the `inet 192.168.1.67/24` a few lines down - and then we're finished.
-
-But no IP address for 'enp0s25'? Well, it's not connected to anything. This is why there is a mysterious question mark at the end of the second pattern. Think of it as a simple higher-level pattern `ab?` where `a` and `b` are Lua string patterns. We abandon the search for 'enp0s25' since we find '3: wlo1:'. 
-
-Want result as nice JSON objects? 
-
-```sh
-$ ip addr | el multimatch it ^'DIGIT: WORD:' ^'inet6* WORD?' : json fields it cols=^'no,dev,ip'
-{"ip":"127.0.0.1/8","dev":"lo","no":1}
-{"no":2,"dev":"enp0s25"}
-{"ip":"192.168.1.67/24","dev":"wlo1","no":3}
-{"ip":"172.20.0.1/16","dev":"br-0efaa7b4f508","no":4}
-{"ip":"172.17.0.1/16","dev":"docker0","no":5}
-{"ip":"172.19.0.1/16","dev":"br-a4f048baa9de","no":6}
-{"ip":"172.18.0.1/16","dev":"br-de7fdfccc0e7","no":7} 
-```
-`fields` will work with an *existing* array and make up an object using column names.
-
-## Appendix II Some Trickery Used to Prepare this Entertainment
+## Appendix: Some Trickery Used to Prepare this Entertainment
 
 ### Metatable Madness
 
@@ -629,13 +439,5 @@ $ el {eval 10 + 20}
 30
 ```
 So `el` solves the old Lisp quoting problem the other way around: it assumes subexpressions are lists, unless the first item is a *global function*. This is convenient but (again) will bite us further down the road - it is not possible to understand from the *shape* the code how it will be interpreted.
-
-I think the most scary kludge was to get string-quoting functions to behave as desired, i.e. let tables through:
-
-```sh
-$ el json^ a=hello b='you peeps' c={10 ^20}
-{"b":"you peeps","c":[10,"20"],"a":"hello"}
-```
-To do this, subexpressions had to be marked using a prefixed `\01` byte (!). Such things happen when all you have are strings.
 
 

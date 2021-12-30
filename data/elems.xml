@@ -1,0 +1,10 @@
+<top>
+    <elems greeting='hi'>
+        <elem>Hello Dolly</elem>
+        <elem>You're so Fine</elem>
+    </elems>
+    <elems greeting='bye'>
+        <elem>Goodbye Dolly</elem>
+        <elem>And Sleep Tight</elem>
+    </elems>
+</top>
