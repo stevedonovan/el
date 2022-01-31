@@ -20,7 +20,7 @@ Can switch these off with `EL_NO_PAT_MASSAGE`.
 $ el sort { {name=^bob age=34} {name=^alice age=35}} ^name
 {{age=35,name="alice"},{age=34,name="bob"}}
 # sort descending! gt is the '>' operation
-$ el sort { {name=^bob age=34} {name=^alice age=35}} ^age gt
+$ el sort { {name=^bob age=34} {name=^aallice age=35}} ^age gt
 {{age=35,name="alice"},{age=34,name="bob"}}
 ```
   - `write` sets `print_newline` flag so `el` ends with a newline
@@ -141,20 +141,18 @@ $ echo 10 20 30 | el fun read_num do it
 30
 ```
 
-Here is a `which`, which is made clearer with a few functions:
+Here is a `which`, which is made clearer with using `exists`:
 
 ```sh
 $ el split PATH ^: : map it {p: open['p.."/go"'] and p}
 {"/home/steve/sdk/go1.16.3/bin"}
-$ el set join={p1,p2: p1 .. ^'/' .. p2}
-$ el set exists={p: open[p] and p}
-$ el split PATH ^: : map it {p: exists join[p,^go]}
+$ el split PATH ^: : map it {p: exists p ^go}
 {"/home/steve/sdk/go1.16.3/bin/go"}
 ```
 The result is a table; this is more elegant:
 
 ```sh
-$ el spliti PATH ^: do exists {join it ^go}
+$ el spliti PATH ^: do exists it ^go
 /home/steve/sdk/go1.16.3/bin/go
 ```
 It goes beyond the usual `which` since it will find all occurances, not the first.
@@ -170,6 +168,7 @@ as a line from a poem,
 
 `fields` is useful for processing structured data like CSV. Note that it is very convenient
 to use the table-as-argument trick to get named parameters. 
+Values will be converted to numbers if possible.
 
 ```sh
 $ echo '10,20,30' | el fields cols=^'x,y,z' delim=^, L
@@ -178,6 +177,15 @@ $ echo '10,20,30' | el fields cols=^'x,y,z' delim=^, L : it.x*it.y
 200
 $ echo 'hello(dolly)' | el fields pat=^'(%a+)%((%a+)%)' cols=^'greeting,name' L
 {greeting="hello",name="dolly"}
+```
+If you don't provide `cols` you will get an array. With `gfields`
+it sets global field variables like AWK:
+
+```sh
+$ echo '10 20' | el fields L
+{10,20}
+$ echo '10 20' | el gfields L : f1 f2 f1/f2
+10      20     0.5
 ```
 
 Sometimes we need to perform an operation on a particular line of input:

@@ -1,10 +1,12 @@
 #!/usr/bin/lua54
+---@diagnostic disable: lowercase-global
 -- Flatten ALL those tidy tables and add environment lookup
 
 local saved_globals = {}
-local bin2int,this_table,debug
+local bin2int,debug
 local auto_save, print_newline, return_code
 local insert,push,pop = table.insert,table.insert,table.remove
+local tfind = string.find
 --~ local set_call
 
 remove = table.remove
@@ -14,6 +16,12 @@ space,lf,tab,empty_string = ' ','\n','\t',''
 
 function squote(s)
     return '\''..s..'\''
+end
+
+local function maybe_num(ns)
+    local n = tonumber(ns)
+    if n then ns = n end
+    return ns
 end
 
 function maparg(t,delim)
@@ -65,7 +73,7 @@ function set_global_lookup()
     setmetatable(_G,{
         __index = function(t,key)
             local v = global_lookup(key)
-            if v then  
+            if v then
                 return v
             end
             local msg = squote(key) .. " is undefined"
@@ -94,7 +102,8 @@ match = function(s,p)
     return s:match(massage_pattern(p))
 end
 
-local ipat,mmatch_res,patterns,patterns_kind,local_match = 1,{}
+local ipat,mmatch_res = 1,{}
+local patterns,patterns_kind,local_match
 
 local function reset_current_array()
     if local_match then
@@ -112,7 +121,7 @@ local function mmatch_reset()
 end
 
 local function remove_trailing_quantifier(a)
-    local trailing = a:match('[^%%]([%?%*%+])$') 
+    local trailing = a:match('[^%%]([%?%*%+])$')
     if trailing then
         a = a:sub(1,#a-1)
     end
@@ -240,7 +249,7 @@ function printx(...)
             io.write(a)
             if i ~= n then
                 io.write(ELSEP)
-            end 
+            end
         end
         print()
     end
@@ -259,15 +268,15 @@ function seq(i1,i2,inc)
         i2 = i1
         i = 1
     end
-    return function()       
+    return function()
         if i > i2 then
             return nil
         end
         local res = i
         i = i + inc
         return res
-    end 
-    
+    end
+
 end
 
 null = setmetatable({},{
@@ -297,7 +306,7 @@ function json(t)
         return 'null'
     else
         return tostring(t)
-    end 
+    end
 end
 
 function lua(t)
@@ -311,21 +320,21 @@ function lua(t)
                 if not (k >= 1 and k <= #t) then
                     push(res,('[%d]=%s'):format(k,lv))
                 end
-            elseif kt == 'string' then  
+            elseif kt == 'string' then
                 if not is_iden(k) then
                     k = "['"..k.."']"
                 end
                 push(res,('%s=%s'):format(k,lv))
             else
                 push(res,('[%s]=%s'):format(tostring(k),lv))
-            end             
+            end
         end
         return '{'..table.concat(res,',')..'}'
     elseif ty == 'string' then
         return ('%q'):format(t)
     else
         return tostring(t)
-    end 
+    end
 end
 
 local red,green,yellow,blue,magenta,cyan,white = '31','32','33','34','35','36','37'
@@ -350,7 +359,7 @@ paint = setmetatable({},{
 
 function foldgen (op)
     return function(...)
-        local args, res = {...}
+        local args = {...}
         if #args == 1 then return args[1] end
         local res = op(args[1],args[2])
         for i = 3,#args do
@@ -360,14 +369,10 @@ function foldgen (op)
     end
 end
 
-local function foldop (name, op)
-    _G[name] = foldgen(op)
-end
-
 -- n-ary cat cannot be generally made from classic folding
-foldop('add',function(acc,v) return acc + v end)
-foldop('mul',function(acc,v) return acc * v end)
-foldop('cat',function(acc,v) return acc .. v end)
+add = foldgen(function(acc,v) return acc + v end)
+mul = foldgen(function(acc,v) return acc * v end)
+cat = foldgen(function(acc,v) return acc .. v end)
 
 function gt(a,b) return a > b end
 function lt(a,b) return a < b end
@@ -386,12 +391,12 @@ call_meta = {
         local res
         if is_list(t1) then
             res = slice(t1,1)
-        else 
+        else
             res = {t1}
         end
         for i = 1,#t2 do push(res,t2[i]) end
         return set_call(res)
-    end    
+    end
 }
 
 function prepend(v,t)
@@ -462,7 +467,8 @@ end
 local last_n
 
 function line(n)
-    local f,i,line = io.stdin,last_n or 0
+    local f,i = io.stdin,last_n or 0
+    local line
     for l in f:lines() do
         line = l
         i = i + 1
@@ -479,13 +485,22 @@ function line(n)
     return nil
 end
 
-function sh(fmt,...)
+local function _sh(fmt,...)
     local cmd = fmt
     if ... ~= nil then
         cmd = fmt:format(...)
     end
-    local res = readf(assert(io.popen(cmd,'r'))):gsub('%s+$','')
+    return assert(io.popen(cmd,'r'))
+end
+
+function sh(fmt,...)
+    local res = readf(_sh(fmt,...)):gsub('%s+$','')
     return res
+end
+
+function shl(fmt,...)
+    local ff = _sh(fmt,...)
+    return ff:lines()
 end
 
 function writefile(path,contents,ext)
@@ -499,15 +514,26 @@ function writefile(path,contents,ext)
     f:close()
 end
 
+function join(dir,file)
+    return dir .. '/' .. file
+end
+
+function exists(dir,file)
+    if file then
+        dir = join(dir,file)
+    end
+    return io.open(dir) and dir
+end
+
 function printf(fmt,...)
-    write(format(fmt,...))
+    write(fmt:format(...))
 end
 
 function split2(arg,sep)
     local idx = index(arg,sep)
     if idx then
-        local a = slice(arg,1,idx-1) 
-        local b = slice(arg,idx+1) 
+        local a = slice(arg,1,idx-1)
+        local b = slice(arg,idx+1)
         return a,b,arg[idx]
     else
         return arg,{}
@@ -545,21 +571,26 @@ function contains(aa, word)
             return true
         end
     end
-    return false    
+    return false
 end
+
+function eq(a,b) return a == b end
+function neq(a,b) return a ~= b end
 
 function map(t,fun,a)
     t = maparg(t)
+    local pp = a == pairs
     local res = {}
     for i = 1,#t do
-        local val = fun(t[i],a) 
+        if pp then a = t[i+1] end
+        local val = fun(t[i],a)
         if val ~= nil then push(res,val) end
     end
     return set_call(res)
 end
 
 function filter(t,pred,a)
-    return map(t,function(x) if pred(x,a) then return x end end)
+    return map(t,function(x,ex) if pred(x,ex) then return x end end,a)
 end
 
 function mapm(t,fun)
@@ -601,7 +632,7 @@ function mapam(t,fun,collect)
         local k,v = fun(t[i])
         if k ~= nil then
             if v == nil then v = t[i] end
-            if collect then                
+            if collect then
                 if res[k] == nil then res[k] = {} end
                 insert(res[k],v)
             else
@@ -621,12 +652,12 @@ function forall(t,fun)
 end
 
 function splitp(s,delim)
-    local idx = find(s,delim or ' ',1,true)
+    local idx = tfind(s,delim or ' ',1,true)
     if not idx then
         return nil
     else
         return s:sub(1,idx-1):gsub('%s*$',''), (s:sub(idx+1):gsub('^%s*',''))
-    end 
+    end
 end
 
 function split(s,re,buff)
@@ -654,6 +685,15 @@ function spliti(s,re)
     return iter(split(s,re))
 end
 
+function run(file)
+    local ext = file:match('%.%a+$')
+    if ext == '.el' then
+        evaluate(split(readfile(file)))
+    else
+        print(dofile(file))
+    end
+end
+
 vars = set_call
 
 function glob(t)
@@ -667,7 +707,7 @@ let = glob
 
 local field_names, patt
 
-function fields(parms)
+function fields(parms,glob)
     if type(parms) == 'string' then
         parms = { parms }
     end
@@ -694,19 +734,24 @@ function fields(parms)
     end
     if not field_names then -- create indices from 1 to N
         field_names = seqa(#splitted)
-    end
-    for i = 1,#splitted do
-        local v = splitted[i]
-        local maybe_num = tonumber(v)
-        if maybe_num then
-            v = maybe_num
+        if glob then
+            for i = 1,#splitted do
+                field_names[i] = 'f' .. field_names[i]
+            end
         end
-        result[field_names[i]] = v
+    end
+    if glob then result = _G end
+    for i = 1,#splitted do
+        result[field_names[i]] = maybe_num(splitted[i])
     end
     if #splitted == 0 then
         return nil
     end
     return set_call(result)
+end
+
+function gfields(parms)
+    return fields(parms,true)
 end
 
 function quit(msg)
@@ -725,34 +770,27 @@ function slice(t,i1,i2)
     return set_call(res)
 end
 
-local first = true
-local push = table.insert
-
-function fold(val,accname,start,op)
-    local acc = g_saved_globals[accname]
-    if first then
-        first = false
-        acc = start
-        set_autosave()
+function acc(name,val,op)
+    op = op or add
+    local acc = rawget(_G,name)
+    if acc == nil then
+        if op==add then acc = 0 elseif op==mul then acc = 1 else acc = {} end
     end
-    g_saved_globals[accname] = op(acc,val)
+    _G[name] = op(acc,val)
+    -- return val
 end
 
-function sum(val,accname)
-    return fold(val,accname,0,add)
-end
-
-function index_by(t,arr,keys)
+function index_by(t,arr,key_index)
     local res = {}
     for i = 1,#arr do
         local idx = arr[i]
         local val = t[idx]
         val = val or null
-        if keys then
+        if key_index then
             res[idx] = val
         else
             push(res,val)
-        end        
+        end
     end
     return set_call(res)
 end
@@ -786,7 +824,7 @@ function zip(t1,t2,op)
     if not op then
         op = function(v1,v2) return {v1,v2} end
     end
-    local res, n  = {}, min(#t1,#t2)
+    local res, n  = {}, math.min(#t1,#t2)
     for i = 1,n do
         res[i] = op(t1[i],t2[i])
     end
@@ -799,12 +837,12 @@ end
 
 function fun(f)
     return function(...)
-        return f(...) 
+        return f(...)
     end
 end
 
 local function olines(n)
-    for i = 1,n do io.write('\n') end
+    for _ = 1,n do io.write('\n') end
 end
 
 function tablefy(t)
@@ -815,15 +853,33 @@ function tablefy(t)
         left = t.left
         top = t.top
         bottom = t.bottom
-        if cols then
-            cols = maparg(cols,',')
-            insert(t,1,cols)
+        local margin = t.margin
+        if margin then
+            left = margin; top = margin; bottom = margin
         end
-        t = t[1]        
+        t = t[1]
     end
     local widths,ncols,nrows,rows = {},#t[1],#t,{}
+    local obj = ncols==0 and next(t[1])
+    if obj and not cols then
+        local gcols = global_lookup("COLS")
+        if gcols then
+            cols = gcols
+        else
+            cols = mapma(t[1],function(k) return k end)
+        end
+    end
+    if cols then
+        cols = maparg(cols,',')
+        insert(t,1,cols)
+        nrows = nrows + 1
+        ncols = #cols
+    end
     for i = 1,nrows do
         local srow,row = {},t[i]
+        if obj and i > 1 then
+            row = index_by(row,cols)
+        end
         if type(row) ~= 'table' then
             for j = 1,ncols do srow[j] = '' end
         else
@@ -833,10 +889,10 @@ function tablefy(t)
         end
         rows[i] = srow
     end
-    for j = 1,#t[1] do -- for each column
+    for j = 1,ncols do -- for each column
         local w = 0
-        for i = 1,#t do -- max over each row
-            w = max(w,#rows[i][j])
+        for i = 1,nrows do -- max over each row
+            w = math.max(w,#rows[i][j])
         end
         insert(widths,w+2) -- for luck
     end
@@ -854,7 +910,7 @@ function tablefy(t)
     end
     if bottom then olines(bottom) end
 end
- 
+
 function bin(n)
     local t = {}
     for i = 1, 32 do
@@ -862,7 +918,7 @@ function bin(n)
         n = bit32.rshift(n, 1)
         if n == 0 then
             break
-        end 
+        end
     end
     return table.concat(t)
 end
@@ -888,30 +944,29 @@ function inc(v)
     return (v or 0) + 1
 end
 
-local function maybe_num(ns)
-    local n = tonumber(ns)
-    if n then ns = n end
-    return ns
-end
-
 local function dotted_ref(t,key)
     if type(key) == 'string' and key:match('%.') then
         local parts = split(key,'%.')
         key = maybe_num(parts[1])
         t = t[key]
         for i = 2,#parts do
-            if type(t) == 'table' then 
+            if type(t) == 'table' then
                 key = maybe_num(parts[i])
                 break
             end
-            if t == nil then return orig end
+            if t == nil then return nil end
             t = t[parts[i]]
         end
+    else
+        key = maybe_num(key)
     end
     return t,key
 end
 
 function get(t,key)
+    if type(key) == "table" then
+        return index_by(t,key)
+    end
     t,key = dotted_ref(t,key)
     return t[key]
 end
@@ -924,7 +979,11 @@ function update(t,...)
         if type(v) == 'function' then
             v = v(t[key])
         end
-        t[key] = v
+        if v == nil and type(key)=="number" then
+           remove(t,key)
+        else
+            t[key] = v
+        end
     end
     return orig
 end
@@ -981,7 +1040,7 @@ function save(tbl)
     local out = {}
     push(out,'local saved = {_G=_G};_ENV=saved')
     for k,v in pairs(tbl) do
-        if v == '' then -- i.e clear the var...
+        if v == null then -- i.e clear the var...
             v = nil
         end
         if literals[k] and v == nil then
@@ -1006,10 +1065,10 @@ function save(tbl)
             end
             if vs ~= nil then
                 push(out,('%s=%s'):format(k,vs))
-            end 
+            end
         else
             push(out,vs)
-        end 
+        end
     end
     if next(literals) then
         push(out,'_ENV=saved._G')
@@ -1061,7 +1120,7 @@ function bquote(a)
 end
 
 function split_key_val(a)
-    local var,expr = a:match '^([%w_%-%.]+)=([^=].*)'
+    local var,expr = a:match '^([%w_%-%.]+[%+%*]*)=([^=].*)'
     if var then
         a = expr
     end
@@ -1084,7 +1143,7 @@ function quote(a)
         return ('readfile(%q)'):format(sa)
     end
     -- help with quoting strings
-    
+
     sa = a:match(string_arg)
     if sa then
         return squote(sa)
@@ -1099,7 +1158,7 @@ function quote(a)
         if sa:match('^%s') then
             sa = sa:sub(2)
         end
-        a = sa 
+        a = sa
     end
     return bquote(a)
 end
@@ -1109,7 +1168,6 @@ function dump(msg,t)
 end
 
 function collect_subexprs(args)
-    local exprs = {}
     local subexprs = {}
     local idx = 1
     local nsub = 0
@@ -1130,11 +1188,11 @@ function collect_subexprs(args)
             inner = block:match ('^[^=]+=.+')
         end
         if inner then
-            table.insert(args,idx,inner)        
+            table.insert(args,idx,inner)
             block = ''
         end
         if block then
-            for i = 1,#opens do
+            for _ = 1,#opens do
                 push(subexprs,subx)
                 subx = {list={},prefix=set}
                 set = nil
@@ -1146,7 +1204,7 @@ function collect_subexprs(args)
             if #block > 0 then -- first element of this sublist
                 push(subx.list,block)
             end
-        end 
+        end
         local endblock,closes = arg:match '^([^}]*)(}+)$'
         -- hack: if we DID match a { then it would have been stripped at this point..
         -- this allows things like {word} to appear in strings. But it's a hack...
@@ -1155,19 +1213,21 @@ function collect_subexprs(args)
             if #endblock > 0 then
                 push(subx.list,endblock)
             end
-            for i = 1,#closes do
+            for _ = 1,#closes do
                 local xsub = chain_expr(subx.list,'subexpr')
                 -- and add to the parent list
                 local prefix = subx.prefix or ''
                 subx = pop(subexprs)
                 push(subx.list,prefix..xsub)
-            end 
+            end
         end
         if not block and not endblock then
             push(subx.list,arg)
         end
     end
-    arg = pop(subexprs).list
+    local res = pop(subexprs)
+    if res == nil then quit("too many closing braces") end
+    arg = res.list
     return arg, nsub
 end
 
@@ -1176,7 +1236,7 @@ function is_iden(name)
 end
 
 function is_op(name)
-    return name and (name:match('^[%+%*%%<>/|~&]+$') or name=='and' or name=='or')
+    return name and (name:match('^[%+%*%-%%<>/|~&=]+$') or name=='and' or name=='or')
 end
 
 function dotted_lookup(expr)
@@ -1218,8 +1278,9 @@ function is_conv_fun(expr)
     return is_global_fun(expr) and _conversions[expr]
 end
 
+local iden = '^(%a[%w_]*)'
 local string_fun = '^(.+)'..stringer..'$'
-local string_name = '^(%a[%w_]*)'..stringer..'$'
+local string_name = iden..stringer..'$'
 
 function is_iterator_fun(expr)
     local name = expr:match(string_fun)
@@ -1239,7 +1300,7 @@ end
 
 function subexpr(arg,iter,lambda_args)
     --  f a b ... becomes f(a,b,...)
-    local tbl,conv
+    local conv
     if #arg == 0 then
         return '{}'
     end
@@ -1251,18 +1312,18 @@ function subexpr(arg,iter,lambda_args)
     if quoted_fun then
         arg[1] = quoted_fun
     end
-    local args,vars,implicit,nsub = {},{}
+    local args,vars,implicit = {},{},nil
     -- collect any {..} and apply quote() to them
     --arg = collect_subexprs(arg)
     local expr = quote(arg[1])
-    
+
     -- top-level - allow for output conversions like bin or hex
     if iter == 'expr' and is_conv_fun(expr) then
         conv = expr
         arg = slice(arg,2)
         expr = quote(arg[1])
     end
-    
+
     if iter == 'iter' then
         -- implicit 'seq'
         if tonumber(expr) ~= nil then
@@ -1277,7 +1338,7 @@ function subexpr(arg,iter,lambda_args)
         elseif not is_global_fun(expr) and not is_op(arg[2]) then
             -- allow multiple values on the top-level using identity function
             implicit = 'eval'
-        end 
+        end
     elseif iter == 'subexpr' then
         local global_fun = is_global_fun(expr)
         if not lambda_args then
@@ -1310,51 +1371,61 @@ function subexpr(arg,iter,lambda_args)
             has_vars = true
             vars[im1] = var
         else
-            vars[im1] = ''      
+            vars[im1] = ''
         end
         if quoted_fun and tostring(val) ~= 'null' then
             val = squote(val)
         end
         args[im1] = val
     end
-    if expr == '' and has_vars then
-        expr = 'eval'
+    local dcl = false
+    if implicit == 'eval' and has_vars then
+        dcl = true
     end
     if is_global_fun(expr) then
         local call
         if has_vars then
             -- key-value pairs as args means collect as single TABLE
             for i = 1,#args do
-               if vars[i] ~= '' then    
-                   local a = args[i]
+               if vars[i] ~= '' then
+                   local a,v = args[i],vars[i]
                    -- functions get string-quoted (to be saved) but do check them!
-                   if is_function(a) then
+                    if is_function(a) then
                         local _,e = load('return '..a)
                         if e then
                             quit('cannot compile '..e)
                         end
                         a = ('%q'):format(a)
-                   end
-                   args[i] = quote_key(vars[i])..'='..a
-               end     
+                    end
+                    if v:match('[%+%*]$') then
+                        v,op = v:sub(1,#v-1),v:sub(#v)
+                        args[i] = v..'='..v..op..a 
+                    else
+                        args[i] = quote_key(v)..'='..a
+                    end
+               end
             end
         end
         -- this ad-hockery is for COOL COLOUR FORMATS
         if expr == 'format' or expr == 'printf' then
             args[1] = massage_format(args[1])
-        end 
-        call = table.concat(args,',')
-        if not has_vars then
-            expr = expr..'('..call..')'
+        end
+        if dcl then
+            expr = table.concat(args,';')
         else
-             -- this is to by-pass the list() function when we have a table containing k-v pairs
-            if expr == 'list' then expr = '' end
-            expr = expr..'{'..call..'}'
+            call = table.concat(args,',')
+            if not has_vars then
+                expr = expr..'('..call..')'
+            else
+                -- this is to by-pass the list() function when we have a table containing k-v pairs
+                if expr == 'list' then expr = '' end
+                expr = expr..'{'..call..'}'
+            end
         end
     else
         expr = expr .. ' ' .. table.concat(args,' ')
     end
-    
+
     if conv then
         if conv == 'not' then
             expr = conv..' '..expr
@@ -1387,14 +1458,17 @@ function chain_expr(expra,kind,no_print)
         escape = 'return nil'
     end
     if #rest > 0 then
-        local k = 1
-        subx = 'local '
+        local k,init = 1,false
+        subx = ''
         while #rest > 0 do
-            -- generally a chain of expressions, but this allows a 'statement'
-            local pass = cexpra[1] == 'pass' and '' or 'it,this='
-            if pass=='' then table.remove(cexpra,1) end
+            -- generally a chain of expressions, but 'pass' allows a 'statement'
+            -- also if we first encounter a var=val
+            local pass = (cexpra[1] == 'pass') and '' or 'it,this='
+            if cexpra[1]:match('^[^=]+=%S') then pass = ''
+            elseif pass=='' then remove(cexpra,1)
+            elseif not init then subx = 'local '; init=true end
             local cexpr = subexpr(cexpra,'expr')
-            subx = subx .. pass..cexpr..'\n' 
+            subx = subx .. pass..cexpr..'\n'
             if conditional and pass ~= '' then
                 subx = subx..'if not it then ' .. escape .. ' end\n'
             end
@@ -1416,7 +1490,7 @@ function chain_expr(expra,kind,no_print)
     local fkind = kind
     if lambda_args or #subx > 0 then fkind = 'expr' end
     -- final expression need not print...
-    if expra[1] == 'pass' then table.remove(expra,1); no_print=true end
+    if expra[1] == 'pass' then remove(expra,1); no_print=true end
     local iexpr = subexpr(expra,kind,lambda_args) -- also needs to know that we are a FINAL expression
     if kind == 'expr' and not no_print then -- final expression prints things out
         iexpr = 'printx('..iexpr..')'
@@ -1425,7 +1499,7 @@ function chain_expr(expra,kind,no_print)
     end
     if ifcond then
         iexpr = ifcond .. iexpr .. ' end'
-    end        
+    end
     local endf = ''
     if #subx > 0 and conditional and kind ~= 'subexpr' then
         endf = ' ::fin::\n'
@@ -1435,25 +1509,22 @@ function chain_expr(expra,kind,no_print)
     end
     if lambda_args then
         subx = 'function('..lambda_args..') '..subx..' end '
-    elseif subwrap then 
+    elseif subwrap then
         subx = '(function() '..subx..' end)()'
     end
     return subx,iexpr,first_expr
 end
 
-function main(arg)
-    local print_final,endxa,expr = true,{}
-    if #arg == 0 then
-        quit('el <expression>. Like sin[2*pi] or date ^%c')
-    end
+function evaluate(arg)
     loads()
     set_global_lookup()
     debug = os.getenv('ELDBG')
     ELSEP = '\t'
     row = 1
 
-    local itera,expra = split2(arg,'do')    
-    if #expra == 0 then 
+    local endxa = {}
+    local itera,expra = split2(arg,'do')
+    if #expra == 0 then
         if is_iterator_fun(itera[1]) then
             -- loop with implicit expr (e.g. 'el seq 10')
             expra = {'it'}
@@ -1464,8 +1535,8 @@ function main(arg)
         end
     end
     expra,endxa = split2(expra,'end')
-    
-    local expr,_,first_expr = chain_expr(expra,'expr', #endxa > 0) 
+
+    local expr,_,first_expr = chain_expr(expra,'expr', #endxa > 0)
     local implicit_var = 'it'
     if not itera and contains(first_expr,'L') then
         itera = {'lines'} -- implicit loop over all lines in stdin
@@ -1478,13 +1549,12 @@ function main(arg)
         if debug == 'T' then expr = ("printx('00',%s); %s"):format(implicit_var,expr) end
         expr = ('%s for %s,this in _iter_(%s) do %s; row=row+1 end %s')
             :format(first,implicit_var,iter,expr,endx)
-        print_final = false
     end
 
     if debug then
         print(expr)
     end
-    
+
     local f,e = load(expr,'expr')
     if e then
         print('error',e)
@@ -1503,4 +1573,8 @@ function main(arg)
     end
 end
 
-main(arg)
+if #arg == 0 then
+    quit('el <expression>. Like sin[2*pi] or date ^%c')
+end
+
+evaluate(arg)
