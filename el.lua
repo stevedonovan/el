@@ -1298,7 +1298,7 @@ local function quote_key(s)
     return s
 end
 
-function subexpr(arg,iter,lambda_args)
+function subexpr(arg,iter,lambda_args,chain)
     --  f a b ... becomes f(a,b,...)
     local conv
     if #arg == 0 then
@@ -1379,7 +1379,7 @@ function subexpr(arg,iter,lambda_args)
         args[im1] = val
     end
     local dcl = false
-    if implicit == 'eval' and has_vars then
+    if implicit == 'eval' and has_vars and chain then
         dcl = true
     end
     if is_global_fun(expr) then
@@ -1467,7 +1467,7 @@ function chain_expr(expra,kind,no_print)
             if cexpra[1]:match('^[^=]+=%S') then pass = ''
             elseif pass=='' then remove(cexpra,1)
             elseif not init then subx = 'local '; init=true end
-            local cexpr = subexpr(cexpra,'expr')
+            local cexpr = subexpr(cexpra,'expr',false,true)
             subx = subx .. pass..cexpr..'\n'
             if conditional and pass ~= '' then
                 subx = subx..'if not it then ' .. escape .. ' end\n'
